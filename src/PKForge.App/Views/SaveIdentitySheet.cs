@@ -122,12 +122,47 @@ public static class SaveIdentitySheet
             $"{SaveDescriptions.EmulatorName(link.Emulator)} did not accept {link.RomFileName}. Open the game from its library instead.", "OK");
     }
 
-    /// <summary>Picks a ROM file and pins it to this save, inferring the emulator from the game.</summary>
+    /// <summary>Picks a ROM for this save: the library first (one tap), the file picker as the manual path.</summary>
     private static async Task LinkRomAsync(Grid host, DetectedSave save)
     {
-        var picker = FilePicker;
         var links = RomLinks;
-        if (picker is null || links is null) return;
+        if (links is null) return;
+
+        // The library path: the scan already found this game's ROM, and the console's
+        // binding decides the emulator. One PadOption, no folder walking.
+        var library = IPlatformApplication.Current?.Services.GetService<IRomLibraryStore>()?.GetAll()
+            ?? [];
+        var candidates = library.Where(r => TrophyCatalog.LabelMatches("Pokémon " + r.GameName, save.EngineHint)).ToList();
+        var options = new List<PadOption>();
+        foreach (var rom in candidates.Take(6))
+            options.Add(new PadOption(rom.FileName, IconPath: "platform-gba", Detail: rom.SystemFolder));
+        if (options.Count > 0) options.Add(new PadOption("Pick a file instead", IconPath: "file"));
+        else options.Add(new PadOption("Pick a ROM file", IconPath: "file"));
+
+        var choice = await PadMenu.ShowAsync(host, LinkRomOption,
+            "Choose this game's ROM. The library's copy needs no picking.", [.. options]);
+        if (choice is null) return;
+
+        if (candidates.FirstOrDefault(r => r.FileName == choice) is { } fromLibrary)
+        {
+            var launcher = Launcher;
+            var emulator = IPlatformApplication.Current?.Services.GetService<IConsoleEmulatorStore>()?.Find(fromLibrary.Console)
+                ?? (launcher is null ? null
+                    : ConsoleRules.EmulatorsFor(fromLibrary.Console)
+                        .FirstOrDefault(kind => EmulatorCatalog.IsInstalled(kind, launcher.IsInstalled)));
+            if (emulator is not { } kind)
+            {
+                await PadMenu.ShowAsync(host, RomMissing,
+                    $"Bind an emulator for the {fromLibrary.Console} in the Emulators tab, or install one.", "OK");
+                return;
+            }
+            links.Set(new RomLink(save.DocumentId, fromLibrary.FilePath, fromLibrary.FileName, kind, save.Generation, save.EngineHint));
+            return;
+        }
+
+        // The manual path: the SAF file picker, as before.
+        var picker = FilePicker;
+        if (picker is null) return;
         var picked = await picker.PickSaveAsync();
         if (picked is null) return;
         var name = picked.DisplayName;
@@ -142,7 +177,7 @@ public static class SaveIdentitySheet
         var installed = emulators.Where(kind => Launcher is { } launcher && EmulatorCatalog.IsInstalled(kind, launcher.IsInstalled)).ToArray();
         if (installed.Length == 0)
         {
-            await PadMenu.ShowAsync(host, "Emulator missing",
+            await PadMenu.ShowAsync(host, RomMissing,
                 $"Install one of these to launch {name}: {string.Join(", ", emulators.Select(SaveDescriptions.EmulatorName))}.", "OK");
             return;
         }

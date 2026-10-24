@@ -239,3 +239,127 @@ public sealed class TrophyStoreManualTests : IDisposable
         if (File.Exists(_path)) File.Delete(_path);
     }
 }
+
+public sealed class RomNameRulesTests
+{
+    [Theory]
+    [InlineData("Pokemon - Emerald Version (France).gba", "Emerald")]
+    [InlineData("Pokemon - Emerald Version.gba", "Emerald")]
+    [InlineData("Pokémon - Rouge Feu (France).gba", "Rouge Feu")]
+    [InlineData("Pokemon - HeartGold Version [b1].nds", "HeartGold")]
+    [InlineData("Pokemon - Or.gbc", "Or")]
+    public void ParsesTheEditionOutOfTheFileName(string fileName, string expected) =>
+        Assert.Equal(expected, RomNameRules.GameName(fileName));
+
+    [Theory]
+    [InlineData("Pokemon - Emerald Version.gba", true)]
+    [InlineData("Pokémon - Or.gbc", true)]
+    [InlineData("Mario Kart DS.nds", false)]
+    [InlineData("emer ald.gba", false)]
+    public void OnlyPokemonFilesPass(string fileName, bool expected) =>
+        Assert.Equal(expected, RomNameRules.LooksLikePokemon(fileName));
+
+    [Theory]
+    [InlineData("Emerald", 3)]
+    [InlineData("Red", 1)]
+    [InlineData("Black 2", 5)]
+    [InlineData("Scarlet", 9)]
+    [InlineData("Unknown Hack", 0)]
+    public void MapsEditionsToGenerations(string gameName, int expected) =>
+        Assert.Equal(expected, RomNameRules.GenerationOf(gameName));
+}
+
+public sealed class ConsoleRulesTests
+{
+    [Fact]
+    public void GenerationsMapToTheirConsoles()
+    {
+        Assert.Equal(GameConsole.GameBoy, ConsoleRules.ForGeneration(1)[0]);
+        Assert.Equal(GameConsole.GameBoyColor, ConsoleRules.ForGeneration(2)[0]);
+        Assert.Equal(GameConsole.GameBoyAdvance, ConsoleRules.ForGeneration(3)[0]);
+        Assert.Equal(GameConsole.NintendoDs, ConsoleRules.ForGeneration(4)[0]);
+        Assert.Equal(GameConsole.NintendoSwitch, ConsoleRules.ForGeneration(9)[0]);
+    }
+
+    [Fact]
+    public void EachConsoleNamesItsEmulatorsInPreferenceOrder()
+    {
+        Assert.Equal(EmulatorKind.RetroArch, ConsoleRules.EmulatorsFor(GameConsole.GameBoy)[0]);
+        Assert.Equal(EmulatorKind.MelonDS, ConsoleRules.EmulatorsFor(GameConsole.NintendoDs)[0]);
+        Assert.Equal(EmulatorKind.Azahar, ConsoleRules.EmulatorsFor(GameConsole.Nintendo3Ds)[0]);
+        Assert.Equal(EmulatorKind.Eden, ConsoleRules.EmulatorsFor(GameConsole.NintendoSwitch)[0]);
+    }
+
+    [Fact]
+    public void InstallChecksFollowThePreferenceList()
+    {
+        Assert.True(ConsoleRules.AnyInstalled(GameConsole.GameBoy, id => id == "com.retroarch.aarch64"));
+        Assert.False(ConsoleRules.AnyInstalled(GameConsole.Nintendo3Ds, id => id == "com.retroarch"));
+    }
+}
+
+public sealed class ConsoleEmulatorStoreTests : IDisposable
+{
+    private readonly string _path = Path.Combine(Path.GetTempPath(), $"consoles-{Guid.NewGuid():N}.json");
+
+    [Fact]
+    public void BindsAndClearsPerConsole()
+    {
+        var store = new Infrastructure.JsonConsoleEmulatorStore(_path);
+        Assert.Null(store.Find(GameConsole.GameBoyAdvance));
+        store.Set(GameConsole.GameBoyAdvance, EmulatorKind.RetroArch);
+        Assert.Equal(EmulatorKind.RetroArch, store.Find(GameConsole.GameBoyAdvance));
+        store.Set(GameConsole.GameBoyAdvance, null);
+        Assert.Null(store.Find(GameConsole.GameBoyAdvance));
+    }
+
+    [Fact]
+    public void TwoConsolesBindIndependently()
+    {
+        var store = new Infrastructure.JsonConsoleEmulatorStore(_path);
+        store.Set(GameConsole.NintendoDs, EmulatorKind.MelonDS);
+        store.Set(GameConsole.GameBoy, EmulatorKind.RetroArch);
+        Assert.Equal(EmulatorKind.MelonDS, store.Find(GameConsole.NintendoDs));
+        Assert.Equal(EmulatorKind.RetroArch, store.Find(GameConsole.GameBoy));
+    }
+
+    [Fact]
+    public void SurvivesAReopenLikeARelaunch()
+    {
+        var store = new Infrastructure.JsonConsoleEmulatorStore(_path);
+        store.Set(GameConsole.NintendoDs, EmulatorKind.MelonDS);
+        Assert.Equal(EmulatorKind.MelonDS, new Infrastructure.JsonConsoleEmulatorStore(_path).Find(GameConsole.NintendoDs));
+    }
+
+    public void Dispose()
+    {
+        if (File.Exists(_path)) File.Delete(_path);
+    }
+}
+
+public sealed class LanguageRulesTests
+{
+    [Fact]
+    public void FrenchIsTheDefault()
+    {
+        Assert.Equal(AppLanguage.French, LanguageRules.Default);
+        Assert.Equal(AppLanguage.French, LanguageRules.Resolve(hasChoice: false, AppLanguage.English, deviceLocale: "de"));
+        Assert.Equal(AppLanguage.French, LanguageRules.Resolve(hasChoice: false, AppLanguage.English, deviceLocale: null));
+    }
+
+    [Theory]
+    [InlineData("fr", true)]
+    [InlineData("fr-FR", true)]
+    [InlineData("fr_CA", true)]
+    [InlineData("en-US", false)]
+    [InlineData(null, false)]
+    public void RecognisesFrenchLocales(string? locale, bool expected) =>
+        Assert.Equal(expected, LanguageRules.IsFrenchLocale(locale));
+
+    [Fact]
+    public void ThePlayersChoiceWins()
+    {
+        Assert.Equal(AppLanguage.English, LanguageRules.Resolve(hasChoice: true, AppLanguage.English, deviceLocale: "fr-FR"));
+        Assert.Equal(AppLanguage.French, LanguageRules.Resolve(hasChoice: true, AppLanguage.French, deviceLocale: "en-US"));
+    }
+}

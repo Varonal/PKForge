@@ -98,6 +98,10 @@ public static class MauiProgram
             Path.Combine(FileSystem.AppDataDirectory, "trophies.json")));
         builder.Services.AddSingleton<Services.TrophyScanService>();
         builder.Services.AddSingleton<Services.TrophyWatcherService>();
+        builder.Services.AddSingleton<IConsoleEmulatorStore>(new Infrastructure.JsonConsoleEmulatorStore(
+            Path.Combine(FileSystem.AppDataDirectory, "console-emulators.json")));
+        builder.Services.AddSingleton<IRomLibraryStore>(new Infrastructure.JsonRomLibraryStore(
+            Path.Combine(FileSystem.AppDataDirectory, "rom-library.json")));
 #if ANDROID
         builder.Services.AddSingleton<ISaveFileAccess, AndroidSafFileAccess>();
         builder.Services.AddSingleton<Platforms.Android.MusicPlayer>();
@@ -108,6 +112,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<IFolderFileAccess, AndroidFolderFileAccess>();
         builder.Services.AddSingleton<IEmulatorDetectionService, AndroidEmulatorScanner>();
         builder.Services.AddSingleton<IEmulatorLauncher, AndroidEmulatorLauncher>();
+        builder.Services.AddSingleton<IRomScanner, AndroidRomScanner>();
         builder.Services.AddSingleton<Services.ITrophyNotifier, AndroidTrophyNotifier>();
 #endif
         builder.Services.AddSingleton<IWatchedRootStore, PreferencesWatchedRootStore>();
@@ -123,6 +128,7 @@ public static class MauiProgram
         builder.Services.AddTransient<EmulatorsPage>();
         builder.Services.AddTransient<RetroAchievementsPage>();
         builder.Services.AddTransient<TrophiesPage>();
+        builder.Services.AddTransient<RomLibraryPage>();
         App.Trace("builder.Build()");
         return builder.Build();
     }
