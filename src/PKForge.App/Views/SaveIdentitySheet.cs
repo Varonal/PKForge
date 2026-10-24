@@ -13,6 +13,9 @@ namespace PKForge.App.Views;
 public static class SaveIdentitySheet
 {
     public const string OpenOption = "Open save";
+    public const string PlayOption = "Play";
+    public const string LinkRomOption = "Link ROM…";
+    public const string UnlinkRomOption = "Unlink ROM";
     private const string RenameOption = "Rename";
     private const string ColorOption = "Cartridge color";
     private const string GameOption = "Set game…";
@@ -31,7 +34,18 @@ public static class SaveIdentitySheet
         var resolved = save.Identity;
 
         var options = new List<PadOption>();
+        var romLink = RomLinks?.FindBySave(save.DocumentId);
         if (offerOpen) options.Add(new PadOption(OpenOption, IconPath: "play"));
+        if (romLink is { } link)
+        {
+            options.Add(new PadOption(PlayOption, IconPath: "play",
+                Detail: $"Launch {link.RomFileName} in {SaveDescriptions.EmulatorName(link.Emulator)}"));
+            options.Add(new PadOption(UnlinkRomOption, IconPath: "unlink", Detail: "Forget this save's ROM. The save file stays."));
+        }
+        options.Add(new PadOption(LinkRomOption, IconPath: "file",
+            Detail: romLink is null
+                ? "Pick this game's ROM once; Play then launches it in its emulator."
+                : $"Replace {romLink.RomFileName}."));
         options.Add(new PadOption(RenameOption, IconPath: "rename"));
         options.Add(new PadOption(ColorOption, Glyph: "●", Accent: SaveColors.For(resolved?.ColorKey, save.Generation),
             Detail: "The colour of this save's cartridge on the Home shelf."));
@@ -52,6 +66,15 @@ public static class SaveIdentitySheet
         {
             case OpenOption:
                 return true;
+            case PlayOption when romLink is { } link:
+                await LaunchAsync(host, link);
+                return false;
+            case LinkRomOption:
+                await LinkRomAsync(host, save);
+                return false;
+            case UnlinkRomOption when romLink is not null:
+                RomLinks?.Remove(save.DocumentId);
+                return false;
             case RenameOption:
                 await RenameAsync(host, store, current, current.DisplayName ?? guess?.SuggestedName ?? save.GameLabel);
                 return false;
@@ -82,6 +105,49 @@ public static class SaveIdentitySheet
     }
 
     private static ISafeSaveWriter? Writer => IPlatformApplication.Current?.Services.GetService<ISafeSaveWriter>();
+
+    private static IRomLinkStore? RomLinks => IPlatformApplication.Current?.Services.GetService<IRomLinkStore>();
+
+    private static IEmulatorLauncher? Launcher => IPlatformApplication.Current?.Services.GetService<IEmulatorLauncher>();
+
+    private static IDocumentPicker? FilePicker => IPlatformApplication.Current?.Services.GetService<IDocumentPicker>();
+
+    /// <summary>Hands a linked ROM to its emulator; the fallback opens the emulator's library.</summary>
+    private static async Task LaunchAsync(Grid host, RomLink link)
+    {
+        var launcher = Launcher;
+        if (launcher is null) return;
+        if (await launcher.LaunchAsync(link)) return;
+        await PadMenu.ShowAsync(host, "Could not launch",
+            $"{SaveDescriptions.EmulatorName(link.Emulator)} did not accept {link.RomFileName}. Open the game from its library instead.", "OK");
+    }
+
+    /// <summary>Picks a ROM file and pins it to this save, inferring the emulator from the game.</summary>
+    private static async Task LinkRomAsync(Grid host, DetectedSave save)
+    {
+        var picker = FilePicker;
+        var links = RomLinks;
+        if (picker is null || links is null) return;
+        var picked = await picker.PickSaveAsync();
+        if (picked is null) return;
+        var name = picked.DisplayName;
+        if (string.IsNullOrWhiteSpace(name)) return;
+        var emulators = RomLinkRules.EmulatorsForRom(save.Generation, name);
+        if (emulators.Count == 0)
+        {
+            await PadMenu.ShowAsync(host, "ROM not linked",
+                $"PKForge cannot launch a Gen {save.Generation} game from {name}. Link a ROM for a Game Boy, GBA or Nintendo DS Pokémon game instead.", "OK");
+            return;
+        }
+        var installed = emulators.Where(kind => Launcher is { } launcher && EmulatorCatalog.IsInstalled(kind, launcher.IsInstalled)).ToArray();
+        if (installed.Length == 0)
+        {
+            await PadMenu.ShowAsync(host, "Emulator missing",
+                $"Install one of these to launch {name}: {string.Join(", ", emulators.Select(SaveDescriptions.EmulatorName))}.", "OK");
+            return;
+        }
+        links.Set(new RomLink(save.DocumentId, picked.DocumentId, name, installed[0], save.Generation, save.EngineHint));
+    }
 
     private static string Describe(DetectedSave save)
     {

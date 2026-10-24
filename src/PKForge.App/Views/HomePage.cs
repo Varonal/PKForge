@@ -87,19 +87,25 @@ public sealed class HomePage : ContentPage, IPadHandler
         var autopilot = new DsCard("pokedex", "Dex Autopilot") { Tapped = () => _ = OpenAutopilotAsync() };
         var park = new DsCard("park", "Poképark") { Tapped = () => _ = PushParkAsync() };
         var events = new DsCard("events", "Events") { Tapped = () => _ = ShowEventsMenuAsync() };
+        var emulators = new DsCard("retroarch", "Emulators") { Tapped = () => _ = PushAsync<EmulatorsPage>() };
+        var trophies = new DsCard("ribbons", "Trophies") { Tapped = () => _ = PushAsync<TrophiesPage>() };
+        var awards = new DsCard("credits", "Awards") { Tapped = () => _ = PushAsync<RetroAchievementsPage>() };
         var settings = new DsCard("settings", "Settings") { Tapped = () => _ = ShowSettingsAsync() };
-        _cards = [bank, autopilot, park, events, settings];
+        _cards = [bank, autopilot, park, events, emulators, trophies, awards, settings];
         foreach (var card in _cards) BlockNativeFocus(card);
         var cards = new Grid
         {
             ColumnSpacing = 10,
-            ColumnDefinitions = [new(GridLength.Star), new(GridLength.Star), new(GridLength.Star), new(GridLength.Star), new(GridLength.Star)],
-            Children = { bank, autopilot, park, events, settings },
+            ColumnDefinitions = [new(GridLength.Star), new(GridLength.Star), new(GridLength.Star), new(GridLength.Star), new(GridLength.Star), new(GridLength.Star), new(GridLength.Star), new(GridLength.Star)],
+            Children = { bank, autopilot, park, events, emulators, trophies, awards, settings },
         };
         Grid.SetColumn(autopilot, 1);
         Grid.SetColumn(park, 2);
         Grid.SetColumn(events, 3);
-        Grid.SetColumn(settings, 4);
+        Grid.SetColumn(emulators, 4);
+        Grid.SetColumn(trophies, 5);
+        Grid.SetColumn(awards, 6);
+        Grid.SetColumn(settings, 7);
 
         var body = new Grid
         {
