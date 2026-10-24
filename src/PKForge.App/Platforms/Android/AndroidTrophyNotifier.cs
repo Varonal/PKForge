@@ -22,20 +22,21 @@ public sealed class AndroidTrophyNotifier : Java.Lang.Object, Services.ITrophyNo
         var context = Platform.AppContext;
         EnsureChannel(context);
 
-        var manager = NotificationManagerCompat.From(context);
+        var manager = NotificationManagerCompat.From(context)
+            ?? throw new InvalidOperationException("NotificationManagerCompat is unavailable.");
         if (!manager.AreNotificationsEnabled()) return Task.CompletedTask;
 
-        var lines = unlocked.Take(3).Select(t => $"{t.Glyph} {t.Title} · {t.GameLabel}").ToList();
-        if (unlocked.Count > 3) lines.Add($"+{unlocked.Count - 3} more");
-        var inbox = new NotificationCompat.InboxStyle();
-        foreach (var line in lines) inbox.AddLine(line!);
-        var style = inbox.SetBigContentTitle(unlocked.Count == 1 ? "Trophy unlocked!" : $"{unlocked.Count} trophies unlocked!");
+        var first = unlocked[0];
+        var summary = unlocked.Count == 1
+            ? $"{first.Glyph} {first.Title}"
+            : $"{unlocked.Count} trophies unlocked, starting with {first.Title}";
+        var detail = string.Join("\n", unlocked.Take(3).Select(t => $"{t.Glyph} {t.Title} · {t.GameLabel}"));
 
         var builder = new NotificationCompat.Builder(context, ChannelId)
             .SetSmallIcon(Resource.Drawable.trophy_notification)
             .SetContentTitle("PKForge trophies")
-            .SetContentText(lines.Count > 0 ? lines[0] : "")
-            .SetStyle(style)
+            .SetContentText(summary)
+            .SetStyle(new NotificationCompat.BigTextStyle().BigText(detail))
             .SetAutoCancel(true);
 
         try

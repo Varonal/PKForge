@@ -2,6 +2,7 @@ using Android.App;
 using Android.Content;
 using Android.Content.PM;
 using Android.Net;
+using PKForge.App.ViewModels;
 using PKForge.Domain;
 
 namespace PKForge.App;
@@ -70,7 +71,7 @@ public sealed class AndroidEmulatorLauncher : IEmulatorLauncher
                 break;
             }
             catch (ActivityNotFoundException) { }
-            catch (SecurityException) { }
+            catch (Java.Lang.SecurityException) { }
         }
         if (!opened)
             Services.AppLog.Info("launch", $"Could not open {SaveDescriptions.EmulatorName(kind)} ({package}): no launchable activity.");
@@ -143,7 +144,7 @@ public sealed class AndroidEmulatorLauncher : IEmulatorLauncher
         {
             started = false;
         }
-        catch (SecurityException)
+        catch (Java.Lang.SecurityException)
         {
             started = false;
         }

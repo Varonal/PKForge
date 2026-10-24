@@ -1,4 +1,5 @@
 using PKForge.App.Services;
+using PKForge.App.ViewModels;
 using PKForge.App.Theme;
 using PKForge.App.ViewModels;
 using PKForge.Domain;
@@ -66,8 +67,8 @@ public static class SaveIdentitySheet
         {
             case OpenOption:
                 return true;
-            case PlayOption when romLink is { } link:
-                await LaunchAsync(host, link);
+            case PlayOption when romLink is not null:
+                await LaunchAsync(host, romLink);
                 return false;
             case LinkRomOption:
                 await LinkRomAsync(host, save);

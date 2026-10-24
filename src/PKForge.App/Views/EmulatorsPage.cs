@@ -263,11 +263,11 @@ public sealed class EmulatorsPage : ContentPage, IPadHandler
         if (_chips.Count == 0) return true;
         var previous = _index >= 0 && _index < _rows.Children.Count ? _rows.Children[_index] as VisualElement : null;
         _index = Math.Clamp(_index < 0 ? 0 : _index + delta, 0, _chips.Count - 1);
-        _ = previous?.ScaleTo(1.0, 80);
+        _ = previous?.ScaleToAsync(1.0, 80);
         if (_rows.Children[_index] is VisualElement current)
         {
-            _ = current.ScaleTo(1.03, 90);
-            _ = current.ScaleTo(1.0, 80);
+            _ = current.ScaleToAsync(1.03, 90);
+            _ = current.ScaleToAsync(1.0, 80);
         }
         return true;
     }

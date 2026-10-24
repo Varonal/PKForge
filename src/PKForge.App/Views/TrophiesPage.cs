@@ -254,7 +254,8 @@ public sealed class TrophiesPage : ContentPage, IPadHandler
         {
             var label = save.EngineHint;
             if (!seen.Add(label)) continue;
-            var definitions = [.. TrophyCatalog.ForGame(label), .. TrophyManualCatalog.ForGame(label)];
+            var definitions = new List<TrophyDefinition>(TrophyCatalog.ForGame(label));
+            definitions.AddRange(TrophyManualCatalog.ForGame(label));
             if (definitions.Count == 0) continue;
             var gameStates = states.Where(s => definitions.Any(d => d.Id == s.TrophyId)).ToList();
             var card = new GameTrophyCard
