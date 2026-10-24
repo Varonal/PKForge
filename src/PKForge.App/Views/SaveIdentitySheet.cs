@@ -146,17 +146,17 @@ public static class SaveIdentitySheet
         if (candidates.FirstOrDefault(r => r.FileName == choice) is { } fromLibrary)
         {
             var launcher = Launcher;
-            var emulator = IPlatformApplication.Current?.Services.GetService<IConsoleEmulatorStore>()?.Find(fromLibrary.Console)
-                ?? (launcher is null ? null
-                    : ConsoleRules.EmulatorsFor(fromLibrary.Console)
-                        .FirstOrDefault(kind => EmulatorCatalog.IsInstalled(kind, launcher.IsInstalled)));
-            if (emulator is not { } kind)
+            var bound = IPlatformApplication.Current?.Services.GetService<IConsoleEmulatorStore>()?.Find(fromLibrary.Console);
+            var fallback = launcher is null ? default
+                : ConsoleRules.EmulatorsFor(fromLibrary.Console)
+                    .FirstOrDefault(kind => EmulatorCatalog.IsInstalled(kind, launcher.IsInstalled));
+            if (bound is null && fallback == default)
             {
-                await PadMenu.ShowAsync(host, RomMissing,
+                await PadMenu.ShowAsync(host, AppStrings.RomMissing,
                     $"Bind an emulator for the {fromLibrary.Console} in the Emulators tab, or install one.", "OK");
                 return;
             }
-            links.Set(new RomLink(save.DocumentId, fromLibrary.FilePath, fromLibrary.FileName, kind, save.Generation, save.EngineHint));
+            links.Set(new RomLink(save.DocumentId, fromLibrary.FilePath, fromLibrary.FileName, bound ?? fallback, save.Generation, save.EngineHint));
             return;
         }
 
@@ -177,7 +177,7 @@ public static class SaveIdentitySheet
         var installed = emulators.Where(kind => Launcher is { } launcher && EmulatorCatalog.IsInstalled(kind, launcher.IsInstalled)).ToArray();
         if (installed.Length == 0)
         {
-            await PadMenu.ShowAsync(host, RomMissing,
+            await PadMenu.ShowAsync(host, AppStrings.RomMissing,
                 $"Install one of these to launch {name}: {string.Join(", ", emulators.Select(SaveDescriptions.EmulatorName))}.", "OK");
             return;
         }

@@ -166,14 +166,16 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
     /// <summary>A tap launches: the console's bound emulator, and the ROM's plain path.</summary>
     private async Task LaunchAsync(LibraryRom rom)
     {
-        var emulator = _consoleEmulators.Find(rom.Console)
-            ?? ConsoleRules.EmulatorsFor(rom.Console).FirstOrDefault(kind => EmulatorCatalog.IsInstalled(kind, _launcher.IsInstalled));
-        if (emulator is not { } kind)
+        var bound = _consoleEmulators.Find(rom.Console);
+        var fallback = ConsoleRules.EmulatorsFor(rom.Console)
+            .FirstOrDefault(kind => EmulatorCatalog.IsInstalled(kind, _launcher.IsInstalled));
+        if (bound is null && fallback == default)
         {
             await PadMenu.ShowAsync(_hostGrid, AppStrings.RomMissing,
                 $"{rom.GameName}: {AppStrings.NotInstalled}.", "OK");
             return;
         }
+        var kind = bound ?? fallback;
         var link = new RomLink("library", rom.FilePath, rom.FileName, kind,
             RomNameRules.GenerationOf(rom.GameName), rom.GameName);
         if (!await _launcher.LaunchAsync(link))
