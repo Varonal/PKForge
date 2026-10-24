@@ -345,11 +345,39 @@ public sealed class HomePage : ContentPage, IPadHandler
     /// <summary>Android settings do not trigger MAUI page appearing again; resume does.</summary>
     private void OnAppResumed()
     {
+        // The automatic trophy watcher: returning from an emulator re-walks the linked
+        // saves and announces anything the play session unlocked. Quiet by design.
+        _ = WatchTrophiesAfterResumeAsync();
+
         if (_pendingAuthorizedUpdate is not { } authorized || !AppUpdateService.CanInstallUpdates())
             return;
 
         _pendingAuthorizedUpdate = null;
         Dispatcher.DispatchAsync(async () => await InstallUpdateAsync(authorized));
+    }
+
+    private bool _trophyWatchQueued;
+
+    /// <summary>One watcher pass per resume, never two in flight, never during a manual scan.</summary>
+    private async Task WatchTrophiesAfterResumeAsync()
+    {
+        if (_trophyWatchQueued) return;
+        _trophyWatchQueued = true;
+        try
+        {
+            var watcher = IPlatformApplication.Current?.Services.GetService<Services.TrophyWatcherService>();
+            if (watcher is null) return;
+            await _viewModel.RescanCommand.ExecuteAsync(null);
+            await watcher.ScanAndAnnounceAsync(_viewModel.Saves.ToList());
+        }
+        catch (Exception error)
+        {
+            Services.AppLog.Info("trophies", $"The resume scan failed: {error.Message}");
+        }
+        finally
+        {
+            _trophyWatchQueued = false;
+        }
     }
 
     /// <summary>Every button on the home screen, in one place.</summary>

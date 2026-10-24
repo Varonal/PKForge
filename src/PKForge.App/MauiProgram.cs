@@ -97,6 +97,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<ITrophyStore>(new Infrastructure.JsonTrophyStore(
             Path.Combine(FileSystem.AppDataDirectory, "trophies.json")));
         builder.Services.AddSingleton<Services.TrophyScanService>();
+        builder.Services.AddSingleton<Services.TrophyWatcherService>();
 #if ANDROID
         builder.Services.AddSingleton<ISaveFileAccess, AndroidSafFileAccess>();
         builder.Services.AddSingleton<Platforms.Android.MusicPlayer>();
@@ -107,6 +108,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<IFolderFileAccess, AndroidFolderFileAccess>();
         builder.Services.AddSingleton<IEmulatorDetectionService, AndroidEmulatorScanner>();
         builder.Services.AddSingleton<IEmulatorLauncher, AndroidEmulatorLauncher>();
+        builder.Services.AddSingleton<Services.ITrophyNotifier, AndroidTrophyNotifier>();
 #endif
         builder.Services.AddSingleton<IWatchedRootStore, PreferencesWatchedRootStore>();
         builder.Services.AddSingleton<BoxBrowserViewModel>();

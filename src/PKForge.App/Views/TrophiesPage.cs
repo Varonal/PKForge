@@ -21,7 +21,7 @@ public sealed class TrophiesPage : ContentPage, IPadHandler
     private VerticalStackLayout _rows = null!;
     private Grid _hostGrid = null!;
     private Label _readout = null!;
-    private GameTrophyCard? _open;
+    private SecondScreenClaim? _secondClaim;
 
     public TrophiesPage(SavePickerViewModel saves, TrophyScanService scanner, ITrophyStore trophies)
     {
@@ -140,7 +140,7 @@ public sealed class TrophiesPage : ContentPage, IPadHandler
         return Kit.Well(content, padding: 10);
     }
 
-    private static View BuildTrophyRow(TrophyDefinition definition, TrophyState? state)
+    private View BuildTrophyRow(TrophyDefinition definition, TrophyState? state)
     {
         var unlocked = state?.Unlocked == true;
         var glyph = new Label
@@ -170,25 +170,77 @@ public sealed class TrophiesPage : ContentPage, IPadHandler
             VerticalOptions = LayoutOptions.Center,
             HorizontalOptions = LayoutOptions.End,
         };
-        return new Grid
+        var row = new Grid
         {
             ColumnDefinitions = [new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto)],
             ColumnSpacing = 6,
             Children = { glyph, name, value },
         };
+        // Manual trophies unlock by the player's own say-so: the row confirms, never scans.
+        if (definition.Kind == TrophyKind.Manual)
+        {
+            var tapRow = new TapGestureRecognizer();
+            tapRow.Tapped += (_, _) => _ = ConfirmManualAsync(definition, state);
+            row.GestureRecognizers.Add(tapRow);
+        }
+        return row;
+    }
+
+    /// <summary>The manual trophy flow: confirm to unlock, confirm again to lock it back.</summary>
+    private async Task ConfirmManualAsync(TrophyDefinition definition, TrophyState? state)
+    {
+        if (state?.Unlocked == true)
+        {
+            var relock = await PadMenu.ConfirmAsync(_hostGrid, $"Relock {definition.Title}?",
+                "Manual trophies are your own record. Locking it back removes the unlock.", "Relock");
+            if (!relock) return;
+            _trophies.Remove(definition.Id);
+        }
+        else
+        {
+            var unlock = await PadMenu.ConfirmAsync(_hostGrid, definition.Title, definition.Description, "Unlock");
+            if (!unlock) return;
+            _trophies.Store(new TrophyState(definition.Id, true, 1));
+        }
+        Rebuild();
+        PublishToSecondScreen();
     }
 
     protected override void OnAppearing()
     {
         base.OnAppearing();
         Rebuild();
+        _secondClaim ??= IPlatformApplication.Current?.Services.GetService<SecondScreenState>()?.Routes.CreateClaim(SecondScreenOwner.Trophies);
+        _secondClaim?.Activate();
+        PublishToSecondScreen();
         IPlatformApplication.Current?.Services.GetService<GamepadRouter>()?.Push(this);
     }
 
     protected override void OnDisappearing()
     {
         base.OnDisappearing();
+        _secondClaim?.Release();
         IPlatformApplication.Current?.Services.GetService<GamepadRouter>()?.Remove(this);
+    }
+
+    /// <summary>Feeds the highlighted game's ladder to the lower screen (a no-op without one).</summary>
+    private void PublishToSecondScreen()
+    {
+        var state = IPlatformApplication.Current?.Services.GetService<SecondScreenState>();
+        if (state is null) return;
+        var card = _cards.Count > 0 ? _cards[_cards.Count - 1] : null;
+        if (card is null)
+        {
+            state.TrophyLadder = null;
+            return;
+        }
+        var rows = card.Definitions.Select(d =>
+        {
+            var trophyState = card.States.FirstOrDefault(s => s.TrophyId == d.Id);
+            return (d.Title, d.Glyph, trophyState?.Unlocked == true,
+                trophyState?.Unlocked == true ? "Unlocked" : $"{trophyState?.Current ?? 0}/{d.Threshold}");
+        }).ToList();
+        state.TrophyLadder = new TrophyLadder(card.GameLabel, card.Generation, card.Percent, card.Unlocked, card.Total, rows);
     }
 
     /// <summary>Rebuilds the overview from the store, keyed by the games the shelf shows.</summary>
@@ -202,7 +254,7 @@ public sealed class TrophiesPage : ContentPage, IPadHandler
         {
             var label = save.EngineHint;
             if (!seen.Add(label)) continue;
-            var definitions = TrophyCatalog.ForGame(label);
+            var definitions = [.. TrophyCatalog.ForGame(label), .. TrophyManualCatalog.ForGame(label)];
             if (definitions.Count == 0) continue;
             var gameStates = states.Where(s => definitions.Any(d => d.Id == s.TrophyId)).ToList();
             var card = new GameTrophyCard

@@ -163,3 +163,79 @@ public sealed class TrophyStoreTests : IDisposable
         if (File.Exists(_path)) File.Delete(_path);
     }
 }
+
+public sealed class TrophyManualCatalogTests
+{
+    [Theory]
+    [InlineData("Pokémon Emerald", 3)]
+    [InlineData("Pokémon Red", 2)]
+    [InlineData("Pokémon Scarlet", 2)]
+    public void MainlineGamesHaveTheirManualLadder(string label, int expected)
+    {
+        var manual = TrophyManualCatalog.ForGame(label);
+        Assert.Equal(expected, manual.Count);
+        Assert.All(manual, t => Assert.Equal(TrophyKind.Manual, t.Kind));
+        Assert.All(manual, t => Assert.Equal(1, t.Threshold));
+        Assert.Contains(manual, t => t.Title == "Champion");
+    }
+
+    [Theory]
+    [InlineData("Pokémon Radical Red")]
+    [InlineData("Unknown Game")]
+    public void GamesOutsideTheCatalogHaveNoManualLadder(string label) =>
+        Assert.Empty(TrophyManualCatalog.ForGame(label));
+
+    [Fact]
+    public void ManualTrophiesNeverUnlockFromScans()
+    {
+        var manual = TrophyManualCatalog.ForGame("Pokémon Emerald")[0];
+        // Even a perfect save measures zero: only the player's confirmation unlocks it.
+        var scan = new SaveScanFacts("s", "Pokémon Emerald", 3, 386, 386, 386, 386, 600, 500);
+        Assert.False(TrophyEngine.Evaluate(manual, scan).Unlocked);
+    }
+
+    [Fact]
+    public void ManualAndScanTrophiesShareOneIdSpace()
+    {
+        var scanTrophies = TrophyCatalog.ForGame("Pokémon Emerald");
+        var manualTrophies = TrophyManualCatalog.ForGame("Pokémon Emerald");
+        var ids = scanTrophies.Select(t => t.Id).Concat(manualTrophies.Select(t => t.Id)).ToList();
+        Assert.Equal(ids.Count, ids.Distinct().Count());
+    }
+
+    [Fact]
+    public void EveryCatalogGameHasAManualChampionTrophy()
+    {
+        foreach (var game in TrophyCatalog.Games)
+            Assert.Contains(TrophyManualCatalog.ForGame(game.Label), t => t.Title == "Champion");
+    }
+}
+
+public sealed class TrophyStoreManualTests : IDisposable
+{
+    private readonly string _path = Path.Combine(Path.GetTempPath(), $"trophies-manual-{Guid.NewGuid():N}.json");
+
+    [Fact]
+    public void ARelockedManualTrophyIsForgotten()
+    {
+        var store = new Infrastructure.JsonTrophyStore(_path);
+        store.Store(new TrophyState("pokemon-red-manual-champion", true, 1));
+        store.Remove("pokemon-red-manual-champion");
+        Assert.Null(store.Find("pokemon-red-manual-champion"));
+    }
+
+    [Fact]
+    public void RemoveKeepsTheOtherTrophies()
+    {
+        var store = new Infrastructure.JsonTrophyStore(_path);
+        store.Store(new TrophyState("pokemon-red-manual-champion", true, 1));
+        store.Store(new TrophyState("pokemon-red-dex60", true, 60));
+        store.Remove("pokemon-red-manual-champion");
+        Assert.NotNull(store.Find("pokemon-red-dex60"));
+    }
+
+    public void Dispose()
+    {
+        if (File.Exists(_path)) File.Delete(_path);
+    }
+}
