@@ -94,6 +94,9 @@ public static class MauiProgram
         builder.Services.AddSingleton<IRetroCredentialStore, Services.SecureRetroCredentialStore>();
         builder.Services.AddSingleton<IRetroAchievementsClient, Services.HttpRetroAchievementsClient>();
         builder.Services.AddSingleton<ViewModels.RetroAchievementsViewModel>();
+        builder.Services.AddSingleton<ITrophyStore>(new Infrastructure.JsonTrophyStore(
+            Path.Combine(FileSystem.AppDataDirectory, "trophies.json")));
+        builder.Services.AddSingleton<Services.TrophyScanService>();
 #if ANDROID
         builder.Services.AddSingleton<ISaveFileAccess, AndroidSafFileAccess>();
         builder.Services.AddSingleton<Platforms.Android.MusicPlayer>();
@@ -117,6 +120,7 @@ public static class MauiProgram
         builder.Services.AddTransient<BankPage>();
         builder.Services.AddTransient<EmulatorsPage>();
         builder.Services.AddTransient<RetroAchievementsPage>();
+        builder.Services.AddTransient<TrophiesPage>();
         App.Trace("builder.Build()");
         return builder.Build();
     }
