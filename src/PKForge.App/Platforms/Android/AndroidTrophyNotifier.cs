@@ -19,7 +19,8 @@ public sealed class AndroidTrophyNotifier : Java.Lang.Object, Services.ITrophyNo
     {
         ArgumentNullException.ThrowIfNull(unlocked);
         if (unlocked.Count == 0) return Task.CompletedTask;
-        var context = Platform.AppContext;
+        var context = Platform.AppContext
+            ?? throw new InvalidOperationException("No Android application context is available.");
         EnsureChannel(context);
 
         var manager = NotificationManagerCompat.From(context)
@@ -41,7 +42,7 @@ public sealed class AndroidTrophyNotifier : Java.Lang.Object, Services.ITrophyNo
 
         try
         {
-            manager.Notify(NotificationId, builder.Build());
+            manager.Notify(NotificationId, builder!.Build());
         }
         catch (Exception error)
         {

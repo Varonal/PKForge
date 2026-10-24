@@ -19,8 +19,8 @@ public sealed class AndroidEmulatorLauncher : IEmulatorLauncher
     public bool IsInstalled(string packageId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
-        var context = Platform.AppContext;
-        var manager = context.PackageManager ?? throw new InvalidOperationException("PackageManager is unavailable.");
+        var manager = Platform.AppContext?.PackageManager
+            ?? throw new InvalidOperationException("PackageManager is unavailable.");
         try
         {
             manager.GetPackageInfo(packageId, 0);
