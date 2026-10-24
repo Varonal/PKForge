@@ -87,6 +87,13 @@ public static class MauiProgram
         builder.Services.AddSingleton<SpritePackDownloader>();
         builder.Services.AddSingleton<AppUpdateService>();
         builder.Services.AddSingleton<TransferService>();
+        builder.Services.AddSingleton<IRomLinkStore>(new Infrastructure.JsonRomLinkStore(
+            Path.Combine(FileSystem.AppDataDirectory, "rom-links.json")));
+        builder.Services.AddSingleton<IRetroProgressStore>(new Infrastructure.JsonRetroProgressStore(
+            Path.Combine(FileSystem.AppDataDirectory, "retro-progress.json")));
+        builder.Services.AddSingleton<IRetroCredentialStore, Services.SecureRetroCredentialStore>();
+        builder.Services.AddSingleton<IRetroAchievementsClient, Services.HttpRetroAchievementsClient>();
+        builder.Services.AddSingleton<ViewModels.RetroAchievementsViewModel>();
 #if ANDROID
         builder.Services.AddSingleton<ISaveFileAccess, AndroidSafFileAccess>();
         builder.Services.AddSingleton<Platforms.Android.MusicPlayer>();
@@ -96,6 +103,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<IFolderPicker, AndroidFolderPicker>();
         builder.Services.AddSingleton<IFolderFileAccess, AndroidFolderFileAccess>();
         builder.Services.AddSingleton<IEmulatorDetectionService, AndroidEmulatorScanner>();
+        builder.Services.AddSingleton<IEmulatorLauncher, AndroidEmulatorLauncher>();
 #endif
         builder.Services.AddSingleton<IWatchedRootStore, PreferencesWatchedRootStore>();
         builder.Services.AddSingleton<BoxBrowserViewModel>();
@@ -107,6 +115,8 @@ public static class MauiProgram
         builder.Services.AddTransient<HomePage>();
         builder.Services.AddTransient<SecondScreenBoxPage>();
         builder.Services.AddTransient<BankPage>();
+        builder.Services.AddTransient<EmulatorsPage>();
+        builder.Services.AddTransient<RetroAchievementsPage>();
         App.Trace("builder.Build()");
         return builder.Build();
     }
