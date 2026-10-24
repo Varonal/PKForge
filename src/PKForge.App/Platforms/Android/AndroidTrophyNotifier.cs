@@ -33,16 +33,18 @@ public sealed class AndroidTrophyNotifier : Java.Lang.Object, Services.ITrophyNo
             : $"{unlocked.Count} trophies unlocked, starting with {first.Title}";
         var detail = string.Join("\n", unlocked.Take(3).Select(t => $"{t.Glyph} {t.Title} · {t.GameLabel}"));
 
-        var builder = new NotificationCompat.Builder(context, ChannelId)
-            .SetSmallIcon(Resource.Drawable.trophy_notification)
-            .SetContentTitle("PKForge trophies")
-            .SetContentText(summary)
-            .SetStyle(new NotificationCompat.BigTextStyle().BigText(detail))
-            .SetAutoCancel(true);
+        // The AndroidX binding annotates every setter's return as nullable, so the
+        // notification is built statement by statement instead of as a fluent chain.
+        var builder = new NotificationCompat.Builder(context, ChannelId)!;
+        builder.SetSmallIcon(Resource.Drawable.trophy_notification);
+        builder.SetContentTitle("PKForge trophies");
+        builder.SetContentText(summary);
+        builder.SetStyle(new NotificationCompat.BigTextStyle()!.BigText(detail));
+        builder.SetAutoCancel(true);
 
         try
         {
-            manager.Notify(NotificationId, builder!.Build());
+            manager.Notify(NotificationId, builder.Build());
         }
         catch (Exception error)
         {
