@@ -37,15 +37,15 @@ public sealed class JsonConsoleEmulatorStore(string? path) : IConsoleEmulatorSto
 
     private void Persist()
     {
-        if (_path is null) return;
+        if (_path is not { } path) return;
         try
         {
-            var directory = Path.GetDirectoryName(_path);
+            var directory = Path.GetDirectoryName(path);
             if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
-            var temp = _path + ".tmp";
+            var temp = path + ".tmp";
             File.WriteAllText(temp, JsonSerializer.Serialize(
                 _entries.Select(e => new ConsoleEmulatorLink(e.Key, e.Value)).ToList()));
-            File.Move(temp, _path, overwrite: true);
+            File.Move(temp, path, overwrite: true);
         }
         catch (IOException) { } // a binding is a convenience; never fail a launch over it
         catch (UnauthorizedAccessException) { }
@@ -86,13 +86,14 @@ public sealed class JsonRomLibraryStore(string? path) : IRomLibraryStore
         ArgumentNullException.ThrowIfNull(roms);
         lock (_gate)
         {
+            if (_path is not { } path) return;
             try
             {
-                var directory = Path.GetDirectoryName(_path);
+                var directory = Path.GetDirectoryName(path);
                 if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
-                var temp = _path + ".tmp";
+                var temp = path + ".tmp";
                 File.WriteAllText(temp, JsonSerializer.Serialize(roms.ToList()));
-                File.Move(temp, _path, overwrite: true);
+                File.Move(temp, path, overwrite: true);
             }
             catch (IOException) { } // the library is rebuilt per scan; a lost write is recovered next scan
             catch (UnauthorizedAccessException) { }
