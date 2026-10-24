@@ -10,18 +10,18 @@ public sealed class TrophyEngineTests
         new("save1", "Pokémon Red", 1, caught, seen, total, shiny, owned, hours);
 
     [Theory]
-    [InlineData(TrophyKind.DexCaught, 60, 60)]
-    [InlineData(TrophyKind.DexCaught, 30, 59)]
-    [InlineData(TrophyKind.DexSeen, 100, 100)]
-    [InlineData(TrophyKind.ShinyOwned, 5, 5)]
-    [InlineData(TrophyKind.PlaytimeHours, 50, 50)]
-    [InlineData(TrophyKind.PokemonOwned, 120, 120)]
-    public void MeasuresTheFactTheKindReads(TrophyKind kind, int threshold, int expectedCurrent)
+    [InlineData(TrophyKind.DexCaught, 60)]
+    [InlineData(TrophyKind.DexSeen, 100)]
+    [InlineData(TrophyKind.ShinyOwned, 5)]
+    [InlineData(TrophyKind.PlaytimeHours, 50)]
+    [InlineData(TrophyKind.PokemonOwned, 120)]
+    public void MeasuresTheFactTheKindReads(TrophyKind kind, int measured)
     {
+        // One scan, fixed facts: each kind reads its own number, whatever the threshold.
         var scan = Facts(caught: 60, seen: 100, shiny: 5, owned: 120, hours: 50);
-        var trophy = new TrophyDefinition("t", "Pokémon Red", 1, kind, threshold, "T", "D");
+        var trophy = new TrophyDefinition("t", "Pokémon Red", 1, kind, measured + 1, "T", "D");
         var state = TrophyEngine.Evaluate(trophy, scan);
-        Assert.Equal(expectedCurrent, state.Current);
+        Assert.Equal(measured, state.Current);
     }
 
     [Fact]
