@@ -133,18 +133,19 @@ public sealed class AndroidEmulatorLauncher : IEmulatorLauncher
     /// </summary>
     private static Intent RetroArchIntent(string package, AndroidUri rom, RomLink link)
     {
-        // RetroArch's CLI contract takes plain ROM paths; a file:// URI makes it
-        // open and idle on a black screen.
+        // The libretro CLI contract, exactly: "Only ROM and LIBRETRO are needed".
+        // A plain ROM path in the ROM extra; no core hint (RetroArch pairs the core
+        // from its own list — a wrong core path black-screens), no config file.
         var romPath = RomPathFor(link);
-        var intent = new Intent(Intent.ActionMain, rom);
+        var intent = new Intent();
         intent.SetPackage(package);
+        intent.SetAction(Intent.ActionMain);
         intent.AddCategory(Intent.CategoryLauncher);
-        intent.SetDataAndType(rom, "application/octet-stream");
-        intent.PutExtra("RETROARCH_LOAD_CONTENT_PATH", romPath);
-        intent.PutExtra("EXTRA_CONTENT", romPath);
-        intent.PutExtra("EXTRA_GAME_LABEL", link.GameLabel);
+        intent.PutExtra("ROM", romPath);
+        // LIBRETRO only when the generation's core is named: a null extra would make
+        // RetroArch load nothing, so unknowns let RetroArch pair the core itself.
         var core = CorePathHint(link.Generation, package);
-        if (core is not null) intent.PutExtra("EXTRA_CORE_PATH", core);
+        if (core is not null) intent.PutExtra("LIBRETRO", core);
         return intent;
     }
 
