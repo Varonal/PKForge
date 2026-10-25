@@ -41,7 +41,7 @@ public sealed class AndroidEmulatorLauncher : IEmulatorLauncher
         var package = app.PackageIds.FirstOrDefault(IsInstalled) ?? app.PrimaryPackage;
         if (!IsInstalled(package))
         {
-            AppLog.Info("launch", $"{SaveDescriptions.EmulatorName(link.Emulator)} is not installed ({package}).");
+            Services.AppLog.Info("launch", $"{SaveDescriptions.EmulatorName(link.Emulator)} is not installed ({package}).");
             return false;
         }
         if (app.LaunchStyle == RomLaunchStyle.OpenAppOnly)
@@ -54,7 +54,7 @@ public sealed class AndroidEmulatorLauncher : IEmulatorLauncher
         var rom = ResolveUri(link.RomUri);
         if (rom is null)
         {
-            AppLog.Info("launch", $"The linked ROM cannot be read: {link.RomUri}");
+            Services.AppLog.Info("launch", $"The linked ROM cannot be read: {link.RomUri}");
             return false;
         }
 
@@ -85,7 +85,7 @@ public sealed class AndroidEmulatorLauncher : IEmulatorLauncher
             catch (Java.Lang.SecurityException) { }
         }
         if (!opened)
-            AppLog.Info("launch", $"Could not open {SaveDescriptions.EmulatorName(kind)}: no launchable activity.");
+            Services.AppLog.Info("launch", $"Could not open {SaveDescriptions.EmulatorName(kind)}: no launchable activity.");
         return Task.FromResult(opened);
     }
 
@@ -170,7 +170,7 @@ public sealed class AndroidEmulatorLauncher : IEmulatorLauncher
             intent.AddFlags(ActivityFlags.GrantReadUriPermission | ActivityFlags.NewTask);
             if (intent.ResolveActivity(activity.PackageManager!) is null)
             {
-                AppLog.Info("launch", $"No activity in the target emulator accepts the ROM handoff ({link.Emulator}).");
+                Services.AppLog.Info("launch", $"No activity in the target emulator accepts the ROM handoff ({link.Emulator}).");
                 return false;
             }
             activity.StartActivity(intent);
@@ -184,7 +184,7 @@ public sealed class AndroidEmulatorLauncher : IEmulatorLauncher
         {
             started = false;
         }
-        AppLog.Info("launch", started
+        Services.AppLog.Info("launch", started
             ? $"Launched {link.RomFileName} in {SaveDescriptions.EmulatorName(link.Emulator)}."
             : $"No activity accepted the launch of {link.RomFileName} ({link.Emulator}).");
         return started;

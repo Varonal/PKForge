@@ -302,8 +302,11 @@ public sealed class FileNameTruncateConverter : IValueConverter
 {
     public static readonly FileNameTruncateConverter Instance = new();
 
-    public object Convert(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture) =>
-        value is string name && name.Length > 28 ? name[..25] + "…" : name ?? string.Empty;
+    public object Convert(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture)
+    {
+        if (value is not string name) return string.Empty;
+        return name.Length > 28 ? name[..25] + "…" : name;
+    }
 
     public object ConvertBack(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture) =>
         throw new NotSupportedException();

@@ -304,8 +304,8 @@ public sealed class HomePage : ContentPage, IPadHandler
                     "Now then... let's find your games!");
 
                 var choice = await PadMenu.ShowAsync(_hostGrid, "Get started", null,
-                    new PadOption(AppStrings.LinkEmulator, IconPath: "link", Detail: Fr ? "Choisissez le dossier où vos jeux gardent leurs sauvegardes." : "Pick the emulator folder where your games keep their saves."),
-                    new PadOption(AppStrings.OpenSingleSave, IconPath: "file", Detail: Fr ? "Choisissez un seul fichier de sauvegarde plutôt qu'un dossier entier." : "Pick one save file instead of a whole emulator folder."),
+                    new PadOption(AppStrings.LinkEmulator, IconPath: "link", Detail: AppStrings.Fr ? "Choisissez le dossier où vos jeux gardent leurs sauvegardes." : "Pick the emulator folder where your games keep their saves."),
+                    new PadOption(AppStrings.OpenSingleSave, IconPath: "file", Detail: AppStrings.Fr ? "Choisissez un seul fichier de sauvegarde plutôt qu'un dossier entier." : "Pick one save file instead of a whole emulator folder."),
                     new PadOption($"Download the sprite pack ({SpritePackDownloader.SizeHint})", IconPath: "download", Detail: "Animated sprites, HOME pictures and item icons, to use offline."),
                     new PadOption("Maybe later", IconPath: "close"));
                 switch (choice)
@@ -629,9 +629,9 @@ public sealed class HomePage : ContentPage, IPadHandler
         var hiddenOption = AppStrings.ShowHiddenSaves(hiddenCount);
         var options = new List<PadOption>
         {
-            new(AppStrings.LinkEmulator, IconPath: "link", Detail: Fr ? "Choisissez le dossier où vos jeux gardent leurs sauvegardes." : "Pick the emulator folder where your games keep their saves."),
-            new(AppStrings.ManageLinkedStorage, IconPath: "sdcard", Detail: Fr ? "Déliez les dossiers d'émulateurs. Vos fichiers restent sur la console." : "Unlink emulator folders. Your files stay on the device."),
-            new(AppStrings.OpenSingleSave, IconPath: "file", Detail: Fr ? "Choisissez un seul fichier de sauvegarde plutôt qu'un dossier entier." : "Pick one save file instead of a whole emulator folder."),
+            new(AppStrings.LinkEmulator, IconPath: "link", Detail: AppStrings.Fr ? "Choisissez le dossier où vos jeux gardent leurs sauvegardes." : "Pick the emulator folder where your games keep their saves."),
+            new(AppStrings.ManageLinkedStorage, IconPath: "sdcard", Detail: AppStrings.Fr ? "Déliez les dossiers d'émulateurs. Vos fichiers restent sur la console." : "Unlink emulator folders. Your files stay on the device."),
+            new(AppStrings.OpenSingleSave, IconPath: "file", Detail: AppStrings.Fr ? "Choisissez un seul fichier de sauvegarde plutôt qu'un dossier entier." : "Pick one save file instead of a whole emulator folder."),
         };
         if (hiddenCount > 0) options.Add(new PadOption(hiddenOption, IconPath: "show", Detail: "Saves you hid from Home. Pick one to show it again."));
         var scheme = $"Color scheme: {PKForge.Chrome.ColorTheme.Current.Name}";
@@ -640,7 +640,7 @@ public sealed class HomePage : ContentPage, IPadHandler
         [
             new PadOption(scheme, IconPath: "palette", Detail: "The app's colors: the default blues or a theme for each type."),
             new PadOption(background, IconPath: "box", Detail: "How each PC box shows the wallpaper the game gives it."),
-            new PadOption(AppStrings.RestorePoints, IconPath: "history", Detail: Fr ? "Les sauvegardes faites avant chaque écriture, pour remettre une sauvegarde comme avant." : "The backups made before each write, to put a save back as it was."),
+            new PadOption(AppStrings.RestorePoints, IconPath: "history", Detail: AppStrings.Fr ? "Les sauvegardes faites avant chaque écriture, pour remettre une sauvegarde comme avant." : "The backups made before each write, to put a save back as it was."),
             new PadOption(AppStrings.AboutPkforge, IconPath: "info"),
             new PadOption(AppStrings.CheckForUpdate, IconPath: "update"),
             new PadOption(AppStrings.Music, IconPath: "music", Detail: AppStrings.Fr ? "Jouez vos propres fichiers audio en arrière-plan." : "Play your own audio files in the background."),
