@@ -56,7 +56,7 @@ public static class EmulatorCatalog
             ["io.github.melonds", "me.magnum.melonds"],
             RomLaunchStyle.UriData),
         new(EmulatorKind.Azahar,
-            ["io.github.lime3ds.android", "org.azahar.azahar", "org.citra.emu", "io.github.azahar"],
+            ["org.azahar_emu.azahar", "io.github.lime3ds.android", "org.citra.emu", "io.github.azahar"],
             RomLaunchStyle.UriData),
         new(EmulatorKind.CitraMmj,
             ["org.citra.emu"],

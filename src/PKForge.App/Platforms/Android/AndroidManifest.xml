@@ -12,6 +12,7 @@
     <package android:name="io.github.melonds" />
     <package android:name="io.github.lime3ds.android" />
     <package android:name="io.github.azahar" />
+    <package android:name="org.azahar_emu.azahar" />
     <package android:name="org.azahar.azahar" />
     <package android:name="org.citra.emu" />
     <package android:name="dev.eden.eden_emulator" />

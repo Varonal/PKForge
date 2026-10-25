@@ -62,7 +62,7 @@ public static class ConsoleRules
         GameConsole.GameBoyColor => [".gbc", ".zip", ".7z"],
         GameConsole.GameBoyAdvance => [".gba", ".zip", ".7z"],
         GameConsole.NintendoDs => [".nds", ".dsi", ".zip", ".7z"],
-        GameConsole.Nintendo3Ds => [".3ds", ".cci", ".cxi", ".zip", ".7z"],
+        GameConsole.Nintendo3Ds => [".cci", ".cxi", ".3ds", ".zip", ".7z"],
         GameConsole.GameCube => [".iso", ".gcm", ".rvz"],
         GameConsole.NintendoSwitch => [".xci", ".nsp", ".zip", ".7z"],
         _ => [],

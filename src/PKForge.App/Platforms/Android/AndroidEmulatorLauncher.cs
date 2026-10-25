@@ -128,12 +128,15 @@ public sealed class AndroidEmulatorLauncher : IEmulatorLauncher
     /// </summary>
     private static Intent RetroArchIntent(string package, AndroidUri rom, RomLink link)
     {
+        // RetroArch's CLI contract takes plain ROM paths; a file:// URI makes it
+        // open and idle on a black screen.
+        var romPath = RomPathFor(link);
         var intent = new Intent(Intent.ActionMain, rom);
         intent.SetPackage(package);
         intent.AddCategory(Intent.CategoryLauncher);
         intent.SetDataAndType(rom, "application/octet-stream");
-        intent.PutExtra("RETROARCH_LOAD_CONTENT_PATH", rom.ToString());
-        intent.PutExtra("EXTRA_CONTENT", rom.ToString());
+        intent.PutExtra("RETROARCH_LOAD_CONTENT_PATH", romPath);
+        intent.PutExtra("EXTRA_CONTENT", romPath);
         intent.PutExtra("EXTRA_GAME_LABEL", link.GameLabel);
         var core = CorePathHint(link.Generation, package);
         if (core is not null) intent.PutExtra("EXTRA_CORE_PATH", core);
@@ -141,21 +144,27 @@ public sealed class AndroidEmulatorLauncher : IEmulatorLauncher
     }
 
     /// <summary>
-    /// melonDS-android's frontend contract (its README): ACTION_VIEW on the ROM with a
-    /// PATH extra, scoped to the package. The activity name differs between builds
-    /// (io.github.melonds vs me.magnum.melonds), so the package scope resolves it.
+    /// melonDS-android's verified frontend configuration (the Beacon/Pegasus setups):
+    /// ACTION_VIEW with the explicit EmulatorActivity component, the ROM as data, a
+    /// "uri" string extra with the URI, and a "PATH" string extra with the plain path —
+    /// all four together. The ROM must appear in melonDS's own library first (its
+    /// scanner); without it, melonDS opens but cannot load the game.
     /// </summary>
     private static Intent PathExtraIntent(string package, AndroidUri rom, RomLink link)
     {
         var intent = new Intent(Intent.ActionView);
-        intent.SetPackage(package);
+        intent.SetComponent(new ComponentName(package, $"{package}.ui.emulator.EmulatorActivity"));
         intent.SetDataAndType(rom, "application/octet-stream");
+        intent.PutExtra("uri", rom.ToString());
         intent.PutExtra("PATH", RomPathFor(link));
+        intent.AddFlags(ActivityFlags.GrantReadUriPermission);
         return intent;
     }
 
     /// <summary>The generic handoff: ACTION_VIEW scoped to the package, ROM as data.
-    /// The emulator's own content screen loads the game (Eden, Azahar, Citra, ...).</summary>
+    /// The yuzu family (Eden, Sudachi) and the Citra family (Azahar) load the game
+    /// from the data URI through their game-file viewer; when the build prefers its
+    /// own library screen, the resolver decides and the game opens from there.</summary>
     private static Intent ViewIntent(string package, AndroidUri rom)
     {
         var intent = new Intent(Intent.ActionView);
