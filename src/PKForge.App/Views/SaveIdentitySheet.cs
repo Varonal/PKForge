@@ -117,7 +117,13 @@ public static class SaveIdentitySheet
     {
         var launcher = Launcher;
         if (launcher is null) return;
-        if (await launcher.LaunchAsync(link)) return;
+        if (await launcher.LaunchAsync(link))
+        {
+            // The game runs: the lower screen becomes its companion until the
+            // player comes back.
+            await (IPlatformApplication.Current?.Services.GetService<Services.GameCompanionStore>()?.StartForGameAsync(link) ?? Task.CompletedTask);
+            return;
+        }
         await PadMenu.ShowAsync(host, "Could not launch",
             $"{SaveDescriptions.EmulatorName(link.Emulator)} did not accept {link.RomFileName}. Open the game from its library instead.", "OK");
     }

@@ -82,6 +82,9 @@ public sealed class SecondScreenBoxPage : ContentPage
         routeMap.IsVisible = false;
         // The Trophies page's ladder: the scanned game's milestones on the lower screen.
         var trophyLadder = new TrophiesLadderView();
+        // The in-game companion: the launched game's dex and restore points while
+        // an emulator owns the foreground.
+        var companion = new GameCompanionView();
 
         // The box cursor's mon, decoded from the live session OFF the UI thread (latest
         // request wins) and cached per (session, edit generation, slot), so a cursor sweep
@@ -158,6 +161,12 @@ public sealed class SecondScreenBoxPage : ContentPage
             var showHero = owner == SecondScreenOwner.Home && preview is not null;
             var showRoute = owner == SecondScreenOwner.Autopilot && state?.AutopilotRoute is not null;
             var showTrophies = owner == SecondScreenOwner.Trophies && state?.TrophyLadder is not null;
+            var showCompanion = services?.GetService<Services.GameCompanionStore>() is { Current: { } active };
+            if (showCompanion)
+            {
+                // The emulator owns the foreground: every PKForge surface yields.
+                showJournal = showDex = showOverview = showSummary = showHero = showRoute = showTrophies = false;
+            }
 
             boxSequence++; // any in-flight box decode is now stale
             if (showDex) UpdateDex(species!.Value);
@@ -171,6 +180,7 @@ public sealed class SecondScreenBoxPage : ContentPage
             }
             if (showHero) hero.SetGame(preview!);
             if (showTrophies) trophyLadder.Show(state!.TrophyLadder!);
+            if (showCompanion) companion.Show(active);
 
             journal.IsVisible = showJournal;
             dex.IsVisible = showDex;
@@ -180,7 +190,8 @@ public sealed class SecondScreenBoxPage : ContentPage
             if (showRoute) routeMap.Show(state!.AutopilotRoute);
             routeMap.IsVisible = showRoute;
             trophyLadder.IsVisible = showTrophies;
-            idle.IsVisible = !showJournal && !showDex && !showOverview && !showSummary && !showHero && !showRoute && !showTrophies;
+            companion.IsVisible = showCompanion;
+            idle.IsVisible = !showJournal && !showDex && !showOverview && !showSummary && !showHero && !showRoute && !showTrophies && !showCompanion;
             PerfTrace.Log("second.swap", swapWatch);
         }
 
@@ -189,7 +200,7 @@ public sealed class SecondScreenBoxPage : ContentPage
             SwapAsync();
             return Task.CompletedTask;
         };
-        Content = new Grid { Children = { DsChrome.GridBackground(), hero, summary, overview, journal, dex, routeMap, trophyLadder, idle } };
+        Content = new Grid { Children = { DsChrome.GridBackground(), hero, summary, overview, journal, dex, routeMap, trophyLadder, companion, idle } };
         SwapAsync();
 
         // Selected, LegalityBadge and friends change together on a cursor move: coalesce

@@ -368,6 +368,9 @@ public sealed class HomePage : ContentPage, IPadHandler
         try
         {
             var watcher = IPlatformApplication.Current?.Services.GetService<Services.TrophyWatcherService>();
+            var companion = IPlatformApplication.Current?.Services.GetService<Services.GameCompanionStore>();
+            // Back from the emulator: the lower screen returns to PKForge's surfaces.
+            companion?.Stop();
             if (watcher is null) return;
             await _viewModel.RescanCommand.ExecuteAsync(null);
             await watcher.ScanAndAnnounceAsync(_viewModel.Saves.ToList());

@@ -302,9 +302,15 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
         var kind = bound ?? fallback;
         var link = new RomLink("library", rom.FilePath, rom.FileName, kind,
             RomNameRules.GenerationOf(rom.GameName), $"Pokémon {rom.GameName}");
-        if (!await _launcher.LaunchAsync(link))
-            await PadMenu.ShowAsync(_hostGrid, AppStrings.RomMissing,
-                $"{SaveDescriptions.EmulatorName(kind)}: {rom.FileName}", AppStrings.Ok);
+        if (await _launcher.LaunchAsync(link))
+        {
+            // The game runs: the lower screen becomes its companion until the
+            // player comes back.
+            await (IPlatformApplication.Current?.Services.GetService<Services.GameCompanionStore>()?.StartForGameAsync(link) ?? Task.CompletedTask);
+            return;
+        }
+        await PadMenu.ShowAsync(_hostGrid, AppStrings.RomMissing,
+            $"{SaveDescriptions.EmulatorName(kind)}: {rom.FileName}", AppStrings.Ok);
     }
 
     /// <summary>One pass over every console's ES-DE folder; the library is replaced wholesale.</summary>

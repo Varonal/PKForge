@@ -97,6 +97,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<ITrophyStore>(new Infrastructure.JsonTrophyStore(
             Path.Combine(FileSystem.AppDataDirectory, "trophies.json")));
         builder.Services.AddSingleton<Services.TrophyScanService>();
+        builder.Services.AddSingleton<Services.GameCompanionStore>();
+        builder.Services.AddSingleton<Domain.IGameCompanionStore>(sp => sp.GetRequiredService<Services.GameCompanionStore>());
         builder.Services.AddSingleton<Services.TrophyWatcherService>();
         builder.Services.AddSingleton<IConsoleEmulatorStore>(new Infrastructure.JsonConsoleEmulatorStore(
             Path.Combine(FileSystem.AppDataDirectory, "console-emulators.json")));
