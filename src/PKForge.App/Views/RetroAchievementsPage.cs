@@ -28,7 +28,7 @@ public sealed class RetroAchievementsPage : ContentPage, IPadHandler
         BackgroundColor = UiTokens.Housing;
         NavigationPage.SetHasNavigationBar(this, false);
 
-        var back = Kit.MiniCapsule("Back", UiTokens.Ink0);
+        var back = Kit.MiniCapsule(AppStrings.Back, UiTokens.Ink0);
         back.WidthRequest = 72;
         back.Clicked += async (_, _) => await Navigation.PopAsync();
 
@@ -51,7 +51,7 @@ public sealed class RetroAchievementsPage : ContentPage, IPadHandler
         };
         readout.SetBinding(Label.TextProperty, new Binding(nameof(RetroAchievementsViewModel.Status), converter: Kit.TidyText));
 
-        var refresh = Kit.Capsule("Refresh", UiTokens.Cyan);
+        var refresh = Kit.Capsule(AppStrings.Fr ? "Rafraîchir" : "Refresh", UiTokens.Cyan);
         refresh.Clicked += (_, _) => _ = RefreshAsync();
 
         _signInPanel = BuildSignInPanel();
@@ -94,7 +94,7 @@ public sealed class RetroAchievementsPage : ContentPage, IPadHandler
             FontFamily = DsChrome.PixelFont,
             TextColor = UiTokens.Ink0,
             BackgroundColor = UiTokens.ShellPress,
-            Placeholder = "RA username",
+            Placeholder = AppStrings.RaUsername,
             PlaceholderColor = UiTokens.Ink1,
             IsSpellCheckEnabled = false,
             IsTextPredictionEnabled = false,
@@ -106,14 +106,14 @@ public sealed class RetroAchievementsPage : ContentPage, IPadHandler
             FontFamily = DsChrome.PixelFont,
             TextColor = UiTokens.Ink0,
             BackgroundColor = UiTokens.ShellPress,
-            Placeholder = "Web API key (control panel)",
+            Placeholder = AppStrings.RaApiKey,
             PlaceholderColor = UiTokens.Ink1,
             IsPassword = true,
             IsSpellCheckEnabled = false,
             IsTextPredictionEnabled = false,
             ReturnType = ReturnType.Done,
         };
-        var signIn = Kit.Capsule("Sign in", UiTokens.Green);
+        var signIn = Kit.Capsule(AppStrings.SignIn, UiTokens.Green);
         signIn.Clicked += async (_, _) =>
         {
             _viewModel.RememberUsername(userEntry.Text ?? "");
@@ -121,7 +121,7 @@ public sealed class RetroAchievementsPage : ContentPage, IPadHandler
             UpdateSignInState();
             await RefreshAsync();
         };
-        var signOut = Kit.Capsule("Sign out", UiTokens.Ink1);
+        var signOut = Kit.Capsule(AppStrings.SignOut, UiTokens.Ink1);
         signOut.Clicked += (_, _) =>
         {
             _viewModel.SignOutCommand.Execute(null);
@@ -138,7 +138,7 @@ public sealed class RetroAchievementsPage : ContentPage, IPadHandler
     private void UpdateSignInState()
     {
         _signInPanel.IsVisible = !_viewModel.SignedIn;
-        if (_viewModel.SignedIn) _viewModel.Status = $"Signed in as {_viewModel.CurrentUsername}.";
+        if (_viewModel.SignedIn) _viewModel.Status = AppStrings.SignedInAs(_viewModel.CurrentUsername ?? "");
     }
 
     private static View BuildGameCard()
@@ -221,7 +221,7 @@ public sealed class RetroAchievementsPage : ContentPage, IPadHandler
         }
         catch (Exception error)
         {
-            _viewModel.Status = $"Refresh failed: {error.Message}";
+            _viewModel.Status = AppStrings.RaRefreshFailed(error.Message);
         }
     }
 

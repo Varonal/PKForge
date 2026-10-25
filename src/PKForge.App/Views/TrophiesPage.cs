@@ -29,18 +29,18 @@ public sealed class TrophiesPage : ContentPage, IPadHandler
         _scanner = scanner;
         _trophies = trophies;
         BindingContext = saves;
-        Title = "Trophies";
+        Title = AppStrings.TrophiesTitle;
         BackgroundColor = UiTokens.Housing;
         NavigationPage.SetHasNavigationBar(this, false);
 
-        var back = Kit.MiniCapsule("Back", UiTokens.Ink0);
+        var back = Kit.MiniCapsule(AppStrings.Back, UiTokens.Ink0);
         back.WidthRequest = 72;
         back.Clicked += async (_, _) => await Navigation.PopAsync();
 
         var header = Kit.HeaderBar("Trophies");
         header.VerticalOptions = LayoutOptions.Center;
 
-        var scan = Kit.Capsule("Scan saves", UiTokens.Cyan);
+        var scan = Kit.Capsule(AppStrings.ScanSaves, UiTokens.Cyan);
         scan.Clicked += (_, _) => _ = ScanAsync();
 
         var titleRow = new Grid
@@ -54,7 +54,7 @@ public sealed class TrophiesPage : ContentPage, IPadHandler
 
         _readout = new Label
         {
-            Text = "Scan runs over every linked save, the same reads as the Museum. Unlocks are permanent.",
+            Text = AppStrings.Fr ? "L'analyse parcourt chaque sauvegarde liée, comme le Musée. Les déblocages sont permanents." : "Scan runs over every linked save, the same reads as the Museum. Unlocks are permanent.",
             TextColor = UiTokens.InkSoft,
             FontFamily = DsChrome.PixelFont,
             FontSize = UiTokens.TextBody,
@@ -163,7 +163,7 @@ public sealed class TrophiesPage : ContentPage, IPadHandler
         };
         var value = new Label
         {
-            Text = unlocked ? "Unlocked" : $"{state?.Current ?? 0}/{definition.Threshold}",
+            Text = unlocked ? AppStrings.Unlocked : $"{state?.Current ?? 0}/{definition.Threshold}",
             TextColor = unlocked ? UiTokens.Green : UiTokens.InkSoft,
             FontFamily = DsChrome.PixelFont,
             FontSize = 12,
@@ -191,14 +191,14 @@ public sealed class TrophiesPage : ContentPage, IPadHandler
     {
         if (state?.Unlocked == true)
         {
-            var relock = await PadMenu.ConfirmAsync(_hostGrid, $"Relock {definition.Title}?",
-                "Manual trophies are your own record. Locking it back removes the unlock.", "Relock");
+            var relock = await PadMenu.ConfirmAsync(_hostGrid, AppStrings.RelockQuestion(definition.Title),
+                AppStrings.ManualTrophyRelockDetail, AppStrings.Relock);
             if (!relock) return;
             _trophies.Remove(definition.Id);
         }
         else
         {
-            var unlock = await PadMenu.ConfirmAsync(_hostGrid, definition.Title, definition.Description, "Unlock");
+            var unlock = await PadMenu.ConfirmAsync(_hostGrid, definition.Title, definition.Description, AppStrings.Fr ? "Débloquer" : "Unlock");
             if (!unlock) return;
             _trophies.Store(new TrophyState(definition.Id, true, 1));
         }
@@ -273,18 +273,18 @@ public sealed class TrophiesPage : ContentPage, IPadHandler
     private async Task ScanAsync()
     {
         if (_saves.IsBusy) return;
-        _readout.Text = "Scanning saves…";
+        _readout.Text = AppStrings.ScanningSaves;
         try
         {
             var facts = await _scanner.ScanAllAsync(_saves.Saves.ToList());
             _readout.Text = facts.Count == 0
-                ? "No linked save could be scanned. Link an emulator first, then scan again."
-                : $"Scanned {facts.Count} save(s). Every trophy the scans prove is unlocked.";
+                ? AppStrings.NoSaveScanned
+                : AppStrings.ScannedSaves(facts.Count);
             Rebuild();
         }
         catch (Exception error)
         {
-            _readout.Text = $"Scan failed: {error.Message}";
+            _readout.Text = AppStrings.ScanFailed(error.Message);
         }
     }
 

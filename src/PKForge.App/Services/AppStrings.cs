@@ -179,6 +179,35 @@ public static class AppStrings
     public static string GuidanceDrastic => Fr ? "Choisissez le dossier de sauvegardes de DraStic (ses .dsv) ou son dossier de données." : "Pick DraStic's backup folder (its .dsv battery saves) or the DraStic data folder.";
     public static string GuidanceEden => Fr ? "Choisissez la racine de fichiers d'Eden, le dossier qui contient son stockage émulé." : "Pick Eden's files root, the folder that contains its emulated storage.";
 
+    // ---- Trophies page ----
+    public static string ScanFailed(string error) => Fr ? $"Le scan a échoué : {error}" : $"Scan failed: {error}";
+    public static string ScanningSaves => Fr ? "Analyse des sauvegardes…" : "Scanning saves…";
+    public static string NoSaveScanned => Fr ? "Aucune sauvegarde liée n'a pu être analysée. Liez un émulateur d'abord, puis réanalysez." : "No linked save could be scanned. Link an emulator first, then scan again.";
+    public static string ScannedSaves(int count) => Fr ? $"{count} sauvegarde(s) analysée(s). Chaque trophée prouvé par le scan est débloqué." : $"Scanned {count} save(s). Every trophy the scans prove is unlocked.";
+    public static string Relock => Fr ? "Verrouiller à nouveau" : "Relock";
+    public static string RelockQuestion(string title) => Fr ? $"Verrouiller à nouveau {title} ?" : $"Relock {title}?";
+    public static string ManualTrophyRelockDetail => Fr ? "Les trophées manuels sont votre propre relevé. Le relock retire le déblocage." : "Manual trophies are your own record. Locking it back removes the unlock.";
+
+    // ---- RetroAchievements page ----
+    public static string SignIn => Fr ? "Se connecter" : "Sign in";
+    public static string SignOut => Fr ? "Se déconnecter" : "Sign out";
+    public static string SignedInAs(string user) => Fr ? $"Connecté en tant que {user}." : $"Signed in as {user}.";
+    public static string SignedOut => Fr ? "Déconnecté. Les succès officiels restent sur retroachievements.org." : "Signed out. Official achievements stay on retroachievements.org.";
+    public static string RaUsername => Fr ? "Nom d'utilisateur RA" : "RA username";
+    public static string RaApiKey => Fr ? "Clé API web (panneau de contrôle)" : "Web API key (control panel)";
+    public static string RaBadCredentials => Fr ? "RetroAchievements n'a pas reconnu ces identifiants." : "RetroAchievements did not recognise those credentials.";
+    public static string RaSignInFailed(string error) => Fr ? $"Échec de connexion : {error}" : $"Sign-in failed: {error}";
+    public static string RaRefreshFailed(string error) => Fr ? $"Échec du rafraîchissement : {error}" : $"Refresh failed: {error}";
+    public static string RaNoSets => Fr ? "Aucun set de succès officiel trouvé pour vos jeux Gen 1-5." : "No official achievement sets found for your Gen 1-5 games.";
+    public static string RaOffline => Fr ? "RetroAchievements injoignable : {0}. La progression en cache est affichée." : "Could not reach RetroAchievements: {0}. Cached progress is shown.";
+
+    // ---- Restore points ----
+    public static string RestorePointsTitle => Fr ? "Points de restauration" : "Restore points";
+    public static string Restore => Fr ? "Restaurer" : "Restore";
+    public static string RestoreThisPoint => Fr ? "Restaurer ce point ?" : "Restore this point?";
+    public static string RestoreAnyway => Fr ? "Restaurer quand même" : "Restore anyway";
+    public static string CancelKeepCurrent => Fr ? "Annuler (garder la sauvegarde actuelle)" : "Cancel (keep current save)";
+
     // ---- Platform names (menu Link) ----
     public static string PlatformGbGbc => Fr ? "Game Boy / Game Boy Color" : "Game Boy / Game Boy Color";
     public static string PlatformGba => "Game Boy Advance";

@@ -17,15 +17,15 @@ public sealed class BackupHistoryPage : ContentPage, IPadHandler
     {
         _viewModel = viewModel;
         BindingContext = viewModel;
-        Title = "Restore points";
+        Title = AppStrings.RestorePointsTitle;
         BackgroundColor = UiTokens.Housing;
         NavigationPage.SetHasNavigationBar(this, false);
 
-        var back = Kit.MiniCapsule("Back", UiTokens.Ink0);
+        var back = Kit.MiniCapsule(AppStrings.Back, UiTokens.Ink0);
         back.WidthRequest = 72;
         back.Clicked += async (_, _) => await Navigation.PopAsync();
 
-        var header = Kit.HeaderBar("Restore points");
+        var header = Kit.HeaderBar(AppStrings.RestorePointsTitle);
         header.VerticalOptions = LayoutOptions.Center;
         var titleRow = new Grid
         {
@@ -193,7 +193,7 @@ public sealed class BackupHistoryPage : ContentPage, IPadHandler
     {
         if (!_viewModel.CanRestore)
         {
-            await PadMenu.ShowAsync(_hostGrid, "Restore", "Connect to a save first - restoring writes into the connected save.", "OK");
+            await PadMenu.ShowAsync(_hostGrid, AppStrings.Restore, AppStrings.Fr ? "Connectez-vous d'abord à une sauvegarde - la restauration écrit dans la sauvegarde connectée." : "Connect to a save first - restoring writes into the connected save.", AppStrings.Ok);
             return;
         }
 
@@ -205,9 +205,9 @@ public sealed class BackupHistoryPage : ContentPage, IPadHandler
         }
 
         var confirmed = await PadMenu.ConfirmAsync(_hostGrid,
-            "Restore this point?",
-            $"Write the {backup.CreatedUtc:yyyy-MM-dd HH:mm} UTC restore point into the connected save? The current state is preserved as a new restore point first.",
-            "Restore");
+            AppStrings.RestoreThisPoint,
+            AppStrings.Fr ? $"Écrire le point de restauration du {backup.CreatedUtc:yyyy-MM-dd HH:mm} UTC dans la sauvegarde connectée ? L'état actuel est d'abord préservé comme nouveau point de restauration." : $"Write the {backup.CreatedUtc:yyyy-MM-dd HH:mm} UTC restore point into the connected save? The current state is preserved as a new restore point first.",
+            AppStrings.Restore);
         if (confirmed)
             await _viewModel.RestoreAsync(backup);
     }
@@ -219,14 +219,16 @@ public sealed class BackupHistoryPage : ContentPage, IPadHandler
     /// </summary>
     private async Task<bool> ConfirmHardcoreRestoreAsync(BackupInfo backup)
     {
-        const string Cancel = "Cancel (keep current save)";
-        const string Anyway = "Restore anyway";
+        var Cancel = AppStrings.CancelKeepCurrent;
+        var Anyway = AppStrings.RestoreAnyway;
         var check = await _viewModel.CheckResurrectionAsync(backup);
         if (check is { IsSafe: true })
-            return await PadMenu.ConfirmAsync(_hostGrid, "Restore this point?",
-                $"Write the {backup.CreatedUtc:yyyy-MM-dd HH:mm} UTC restore point into the connected save? " +
+            return await PadMenu.ConfirmAsync(_hostGrid, AppStrings.RestoreThisPoint,
+                AppStrings.Fr ? $"Écrire le point de restauration du {backup.CreatedUtc:yyyy-MM-dd HH:mm} UTC dans la sauvegarde connectée ? " +
+                "Aucun Pokémon parti de cette sauvegarde depuis ne reviendrait. L'état actuel est d'abord préservé comme nouveau point de restauration."
+                : $"Write the {backup.CreatedUtc:yyyy-MM-dd HH:mm} UTC restore point into the connected save? " +
                 "No Pokémon that has left this save since then would come back. The current state is preserved as a new restore point first.",
-                "Restore");
+                AppStrings.Restore);
 
         string message;
         if (check is null)
@@ -248,7 +250,7 @@ public sealed class BackupHistoryPage : ContentPage, IPadHandler
                 "Release or withdraw those copies yourself if you restore.";
         }
 
-        var choice = await PadMenu.ShowAsync(_hostGrid, "Duplication risk", message, Cancel, Anyway);
+        var choice = await PadMenu.ShowAsync(_hostGrid, AppStrings.Fr ? "Risque de duplication" : "Duplication risk", message, Cancel, Anyway);
         return choice == Anyway;
     }
 
