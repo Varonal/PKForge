@@ -945,7 +945,9 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
             return;
         }
         var lockedTargets = selected.Where(box => DocumentId is not null && Protection.IsBoxLocked(DocumentId!, box)).ToList();
-        if ((choice == AppStrings.Fr ? "Vider les boîtes sélectionnées" : "Empty selected boxes" || choice == (AppStrings.Fr ? "Supprimer la/des boîte(s) (Pokémon secourus)" : "Delete box(es) (rescue Pokémon)")) && lockedTargets.Count > 0)
+        if ((choice == (AppStrings.Fr ? "Vider les boîtes sélectionnées" : "Empty selected boxes")
+                || choice == (AppStrings.Fr ? "Supprimer la/des boîte(s) (Pokémon secourus)" : "Delete box(es) (rescue Pokémon)"))
+            && lockedTargets.Count > 0)
         {
             _viewModel.Status = $"{lockedTargets.Count} target box(ES) are locked";
             return;

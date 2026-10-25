@@ -161,7 +161,9 @@ public sealed class SecondScreenBoxPage : ContentPage
             var showHero = owner == SecondScreenOwner.Home && preview is not null;
             var showRoute = owner == SecondScreenOwner.Autopilot && state?.AutopilotRoute is not null;
             var showTrophies = owner == SecondScreenOwner.Trophies && state?.TrophyLadder is not null;
-            var showCompanion = services?.GetService<Services.GameCompanionStore>() is { Current: { } active };
+            var companionStore = services?.GetService<Services.GameCompanionStore>();
+            var active = companionStore?.Current;
+            var showCompanion = active is not null;
             if (showCompanion)
             {
                 // The emulator owns the foreground: every PKForge surface yields.
