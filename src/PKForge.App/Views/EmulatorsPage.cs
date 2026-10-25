@@ -392,10 +392,10 @@ public sealed class EmulatorsPage : ContentPage, IPadHandler
             return;
         }
         // Nothing in the standard folders: the SAF flow says which folder it wants.
-        var folders = EmulatorSaveFolders.For(kind);
+        var expected = EmulatorSaveFolders.For(kind);
         _viewModel.Status = AppStrings.Fr
-            ? $"Dossiers standards introuvables pour {SaveDescriptions.EmulatorName(kind)}. Le sélecteur s'ouvre : choisissez {string.Join(" / ", folders.Take(3))} sous /storage/emulated/0."
-            : $"No standard folders for {SaveDescriptions.EmulatorName(kind)}. The picker opens: choose {string.Join(" / ", folders.Take(3))} under /storage/emulated/0.";
+            ? $"Dossiers standards introuvables pour {SaveDescriptions.EmulatorName(kind)}. Le sélecteur s'ouvre : choisissez {string.Join(" / ", expected.Take(3))} sous /storage/emulated/0."
+            : $"No standard folders for {SaveDescriptions.EmulatorName(kind)}. The picker opens: choose {string.Join(" / ", expected.Take(3))} under /storage/emulated/0.";
         await command.ExecuteAsync(null);
         RefreshChips();
     }

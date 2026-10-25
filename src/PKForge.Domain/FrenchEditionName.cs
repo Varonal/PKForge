@@ -47,7 +47,9 @@ public static class FrenchEditionName
         if (string.IsNullOrWhiteSpace(name)) return null;
         var clean = name.Trim();
         if (FrenchToEnglish.TryGetValue(clean, out var english)) return english;
-        return EnglishEditions.Contains(clean) ? clean : null;
+        if (!EnglishEditions.Contains(clean)) return null;
+        // A bare lower-case file name ("emerald.gba") still shows its catalog casing.
+        return char.ToUpperInvariant(clean[0]) + clean[1..];
     }
 
     private static readonly HashSet<string> EnglishEditions =

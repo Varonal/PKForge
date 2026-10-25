@@ -16,7 +16,9 @@ public sealed class JsonConsoleEmulatorStore(string? path) : IConsoleEmulatorSto
 
     public EmulatorKind? Find(GameConsole console)
     {
-        lock (_gate) return _entries.GetValueOrDefault(console);
+        // GetValueOrDefault would return RetroArch (the enum's 0) for a missing key;
+        // an unset binding must read as null.
+        lock (_gate) return _entries.TryGetValue(console, out var emulator) ? emulator : null;
     }
 
     public void Set(GameConsole console, EmulatorKind? emulator)
