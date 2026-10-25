@@ -182,7 +182,7 @@ public sealed class SecondScreenBoxPage : ContentPage
             }
             if (showHero) hero.SetGame(preview!);
             if (showTrophies) trophyLadder.Show(state!.TrophyLadder!);
-            if (showCompanion) companion.Show(active);
+            if (active is { } shownCompanion) companion.Show(shownCompanion);
 
             journal.IsVisible = showJournal;
             dex.IsVisible = showDex;
