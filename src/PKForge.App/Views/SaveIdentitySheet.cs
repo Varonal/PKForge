@@ -136,11 +136,11 @@ public static class SaveIdentitySheet
         var options = new List<PadOption>();
         foreach (var rom in candidates.Take(6))
             options.Add(new PadOption(rom.FileName, IconPath: "platform-gba", Detail: rom.SystemFolder));
-        if (options.Count > 0) options.Add(new PadOption("Pick a file instead", IconPath: "file"));
-        else options.Add(new PadOption("Pick a ROM file", IconPath: "file"));
+        if (options.Count > 0) options.Add(new PadOption(AppStrings.Fr ? "Choisir un fichier plutôt" : "Pick a file instead", IconPath: "file"));
+        else options.Add(new PadOption(AppStrings.Fr ? "Choisir un fichier ROM" : "Pick a ROM file", IconPath: "file"));
 
         var choice = await PadMenu.ShowAsync(host, LinkRomOption,
-            "Choose this game's ROM. The library's copy needs no picking.", [.. options]);
+            AppStrings.Fr ? "Choisissez la ROM de ce jeu. La copie de la bibliothèque évite le sélecteur." : "Choose this game's ROM. The library's copy needs no picking.", [.. options]);
         if (choice is null) return;
 
         if (candidates.FirstOrDefault(r => r.FileName == choice) is { } fromLibrary)

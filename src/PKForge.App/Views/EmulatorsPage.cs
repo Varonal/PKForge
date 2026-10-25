@@ -17,6 +17,7 @@ public sealed class EmulatorsPage : ContentPage, IPadHandler
     private readonly SavePickerViewModel _viewModel;
     private readonly IEmulatorLauncher _launcher;
     private readonly IConsoleEmulatorStore _consoleEmulators;
+    private readonly DirectSaveScanner _saveScanner;
     private readonly List<EmulatorChip> _chips = [];
     private VerticalStackLayout _rows = null!;
     private Grid _hostGrid = null!;
@@ -38,11 +39,12 @@ public sealed class EmulatorsPage : ContentPage, IPadHandler
         _ => null,
     };
 
-    public EmulatorsPage(SavePickerViewModel viewModel, IEmulatorLauncher launcher, IConsoleEmulatorStore consoleEmulators)
+    public EmulatorsPage(SavePickerViewModel viewModel, IEmulatorLauncher launcher, IConsoleEmulatorStore consoleEmulators, Domain.ISaveEngine engine)
     {
         _viewModel = viewModel;
         _launcher = launcher;
         _consoleEmulators = consoleEmulators;
+        _saveScanner = new DirectSaveScanner(engine);
         BindingContext = viewModel;
         Title = AppStrings.EmulatorsTitle;
         BackgroundColor = UiTokens.Housing;
@@ -371,16 +373,15 @@ public sealed class EmulatorsPage : ContentPage, IPadHandler
     {
         // Cocoon-style: the standard save folders first, no folder picker at all.
         // The SAF grant flow stays as the fallback for custom setups.
-        var direct = EmulatorSaveFolders.ExistingFor(kind);
-        if (direct.Count > 0)
+        var folders = EmulatorSaveFolders.ExistingFor(kind);
+        if (folders.Count > 0)
         {
-            var found = new DirectSaveScanner(
-                IPlatformApplication.Current!.Services.GetRequiredService<Domain.ISaveEngine>()).Scan(kind);
+            var found = _saveScanner.Scan(kind);
             if (found.Count > 0)
             {
                 _viewModel.Status = AppStrings.Fr
-                    ? $"{SaveDescriptions.EmulatorName(kind)} : {found.Count} sauvegarde(s) trouvée(s) dans {direct.Count} dossier(s) standard(s)."
-                    : $"{SaveDescriptions.EmulatorName(kind)}: {found.Count} save(s) found in {direct.Count} standard folder(s).";
+                    ? $"{SaveDescriptions.EmulatorName(kind)} : {found.Count} sauvegarde(s) trouvée(s) dans {folders.Count} dossier(s) standard(s)."
+                    : $"{SaveDescriptions.EmulatorName(kind)}: {found.Count} save(s) found in {folders.Count} standard folder(s).";
                 return;
             }
         }

@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using Microsoft.Maui.Controls.Shapes;
 using PKForge.App.Services;
 using PKForge.App.Theme;
@@ -22,7 +21,6 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
     private readonly IConsoleEmulatorStore _consoleEmulators;
     private readonly IEmulatorLauncher _launcher;
     private readonly DirectSaveScanner? _saveScanner;
-    private readonly ObservableCollection<LibraryRom> _roms = [];
     private VerticalStackLayout _rows = null!;
     private Grid _hostGrid = null!;
     private Label _readout = null!;
@@ -119,7 +117,6 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
 
     private void Rebuild(IReadOnlyList<LibraryRom> roms)
     {
-        _roms.Clear();
         _rows.Children.Clear();
         // The whole catalog shows: owned games first (with their ROM), the rest after,
         // each with a colored owned/missing label.
@@ -131,10 +128,7 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
             .Select(game => (Game: game, Rom: byName.GetValueOrDefault(Normalise(game.Label))))
             .ToList();
         foreach (var (game, rom) in ordered)
-        {
-            if (rom is not null) _roms.Add(rom);
             _rows.Children.Add(rom is not null ? BuildRomCard(rom) : BuildMissingCard(game.Label, game.Generation));
-        }
         _countLabel.Text = AppStrings.RomCount(roms.Count);
         _readout.Text = roms.Count > 0
             ? AppStrings.RomCount(roms.Count)

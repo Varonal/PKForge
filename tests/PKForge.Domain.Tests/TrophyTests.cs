@@ -242,22 +242,8 @@ public sealed class TrophyStoreManualTests : IDisposable
 
 public sealed class RomNameRulesTests
 {
-    [Theory]
-    [InlineData("Pokemon - Emerald Version (France).gba", "Emerald")]
-    [InlineData("Pokemon - Emerald Version.gba", "Emerald")]
-    [InlineData("Pokémon - Rouge Feu (France).gba", "FireRed")]
-    [InlineData("Pokemon - HeartGold Version [b1].nds", "HeartGold")]
-    [InlineData("Pokemon - Or.gbc", "Gold")]
-    public void ParsesTheEditionOutOfTheFileName(string fileName, string expected) =>
-        Assert.Equal(expected, RomNameRules.GameName(fileName));
-
-    [Theory]
-    [InlineData("Pokemon - Emerald Version.gba", true)]
-    [InlineData("Pokémon - Or.gbc", true)]
-    [InlineData("Mario Kart DS.nds", false)]
-    [InlineData("emer ald.gba", false)]
-    public void OnlyPokemonFilesPass(string fileName, bool expected) =>
-        Assert.Equal(expected, RomNameRules.LooksLikePokemon(fileName));
+    // GameName and LooksLikePokemon cases live in FrenchEditionNameTests, which
+    // covers English, French, No-Intro and bare-name files in one place.
 
     [Theory]
     [InlineData("Emerald", 3)]
@@ -362,4 +348,55 @@ public sealed class LanguageRulesTests
         Assert.Equal(AppLanguage.English, LanguageRules.Resolve(hasChoice: true, AppLanguage.English, deviceLocale: "fr-FR"));
         Assert.Equal(AppLanguage.French, LanguageRules.Resolve(hasChoice: true, AppLanguage.French, deviceLocale: "en-US"));
     }
+}
+
+public sealed class FrenchEditionNameTests
+{
+    [Theory]
+    [InlineData("Pokemon - Emerald Version (France).gba", "Emerald")]
+    [InlineData("1636 - Pokemon Emerald (Independent).gba", "Emerald")]
+    [InlineData("Pokemon - Version Émeraude (Fr).gba", "Emerald")]
+    [InlineData("Pokémon Emeraude.gba", "Emerald")]
+    [InlineData("emerald.gba", "Emerald")]
+    [InlineData("Pokemon - Rouge Feu (France).gba", "FireRed")]
+    [InlineData("Pokemon - Or.gbc", "Gold")]
+    [InlineData("Pokemon - Version Écarlate.nsz", "Scarlet")]
+    [InlineData("Pokemon - Épée.nsp", "Sword")]
+    public void ParsesNoIntroFrenchAndBareNames(string fileName, string expected) =>
+        Assert.Equal(expected, RomNameRules.GameName(fileName));
+
+    [Theory]
+    [InlineData("rouge", "Red")]
+    [InlineData("rouge feu", "FireRed")]
+    [InlineData("émeraude", "Emerald")]
+    [InlineData("emeraude", "Emerald")]
+    [InlineData("diamant étincelant", "Brilliant Diamond")]
+    [InlineData("perle scintillante", "Shining Pearl")]
+    [InlineData("écarlate", "Scarlet")]
+    [InlineData("épée", "Sword")]
+    public void MapsFrenchEditionsToEnglish(string french, string expected) =>
+        Assert.Equal(expected, FrenchEditionName.ToEnglish(french));
+
+    [Theory]
+    [InlineData("Emerald")]
+    [InlineData("FireRed")]
+    [InlineData("Scarlet")]
+    public void EnglishEditionsPassThrough(string english) =>
+        Assert.Equal(english, FrenchEditionName.ToEnglish(english));
+
+    [Theory]
+    [InlineData("Radical Red")]
+    [InlineData("Unbound")]
+    [InlineData("Something Else")]
+    public void UnknownNamesReturnNull(string unknown) =>
+        Assert.Null(FrenchEditionName.ToEnglish(unknown));
+
+    [Theory]
+    [InlineData("1636 - Pokemon Emerald (Independent).gba", true)]
+    [InlineData("emerald.gba", true)]
+    [InlineData("rouge feu.gba", true)]
+    [InlineData("Mario Kart DS.nds", false)]
+    [InlineData("tetris.gb", false)]
+    public void TheScannerRecognisesPokemonFilesOnly(string fileName, bool expected) =>
+        Assert.Equal(expected, RomNameRules.LooksLikePokemon(fileName));
 }
