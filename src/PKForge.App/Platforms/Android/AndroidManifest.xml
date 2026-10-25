@@ -27,5 +27,13 @@
     <package android:name="it.dbtecno.pizzaboy" />
     <package android:name="it.dbtecno.pizzaboygbc" />
   </queries>
-  <application android:label="PKForge" android:icon="@mipmap/pkforge" android:roundIcon="@mipmap/pkforge_round" android:allowBackup="true" android:supportsRtl="true" />
+  <application android:label="PKForge" android:icon="@mipmap/pkforge" android:roundIcon="@mipmap/pkforge_round" android:allowBackup="true" android:supportsRtl="true">
+    <provider
+        android:name="androidx.core.content.FileProvider"
+        android:authorities="org.pkforge.app.romprovider"
+        android:exported="false"
+        android:grantUriPermissions="true">
+      <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/rom_provider_paths" />
+    </provider>
+  </application>
 </manifest>

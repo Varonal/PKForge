@@ -93,8 +93,12 @@ public sealed class AndroidEmulatorLauncher : IEmulatorLauncher
         return Task.FromResult(opened);
     }
 
-    /// <summary>content:// ids pass through; plain file paths become file:// URIs that
-    /// exist on disk; anything unreadable returns null (the launch says so).</summary>
+    /// <summary>
+    /// content:// ids pass through; plain file paths become FileProvider content://
+    /// URIs — the only URI kind Android can grant another app read access to
+    /// (FLAG_GRANT_READ_URI_PERMISSION does nothing on file:// URIs, which is why the
+    /// emulators opened but could not load the game).
+    /// </summary>
     private static AndroidUri? ResolveUri(string romUri)
     {
         if (romUri.StartsWith("content://", StringComparison.Ordinal))
@@ -102,7 +106,8 @@ public sealed class AndroidEmulatorLauncher : IEmulatorLauncher
         try
         {
             if (!File.Exists(romUri)) return null;
-            return AndroidUri.FromFile(new Java.IO.File(romUri));
+            return AndroidX.Core.Content.FileProvider.GetUriForFile(
+                Platform.AppContext!, "org.pkforge.app.romprovider", new Java.IO.File(romUri));
         }
         catch (Exception)
         {

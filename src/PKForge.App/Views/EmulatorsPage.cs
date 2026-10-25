@@ -187,6 +187,8 @@ public sealed class EmulatorsPage : ContentPage, IPadHandler
             ColumnSpacing = 10,
             Children = { icon, name, binding },
         };
+        Grid.SetColumn(name, 1);
+        Grid.SetColumn(binding, 2);
         var tap = new TapGestureRecognizer();
         tap.Tapped += (_, _) => _ = ChooseConsoleEmulatorAsync(row);
         line.GestureRecognizers.Add(tap);
@@ -281,6 +283,8 @@ public sealed class EmulatorsPage : ContentPage, IPadHandler
             ColumnSpacing = 10,
             Children = { icon, identity, state },
         };
+        Grid.SetColumn(identity, 1);
+        Grid.SetColumn(state, 2);
         var tap = new TapGestureRecognizer();
         tap.Tapped += (_, _) => _ = LinkAsync(chip.Kind);
         row.GestureRecognizers.Add(tap);

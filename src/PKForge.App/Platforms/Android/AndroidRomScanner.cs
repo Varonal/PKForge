@@ -86,7 +86,7 @@ public sealed class AndroidRomScanner : IRomScanner
             GameConsole.GameBoyColor => ["gameboycolor", "gbc", "gameboy"],
             GameConsole.GameBoyAdvance => ["gameboyadvance", "gba"],
             GameConsole.NintendoDs => ["nds", "ds"],
-            GameConsole.Nintendo3Ds => ["3ds"],
+            GameConsole.Nintendo3Ds => ["3ds", "n3ds", "3dscloud"],
             GameConsole.GameCube => ["gamecube", "gc"],
             GameConsole.NintendoSwitch => ["switch"],
             _ => [],

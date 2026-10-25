@@ -181,7 +181,7 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
             HorizontalOptions = LayoutOptions.End,
         };
         var text = new VerticalStackLayout { Spacing = 2, VerticalOptions = LayoutOptions.Center, Children = { title, subtitle } };
-        return new Border
+        var card = new Border
         {
             BackgroundColor = UiTokens.Housing,
             Stroke = UiTokens.ShellEdge,
@@ -196,6 +196,9 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
                 Children = { new Grid { Children = { mark, art } }, text, missing },
             },
         };
+        Grid.SetColumn(text, 1);
+        Grid.SetColumn(missing, 2);
+        return card;
     }
 
     /// <summary>One game card: artwork (cartridge mark as fallback), title, generation·
