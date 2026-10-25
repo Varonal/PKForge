@@ -369,12 +369,32 @@ public sealed class EmulatorsPage : ContentPage, IPadHandler
 
     private async Task LinkAsync(EmulatorKind kind)
     {
+        // Cocoon-style: the standard save folders first, no folder picker at all.
+        // The SAF grant flow stays as the fallback for custom setups.
+        var direct = EmulatorSaveFolders.ExistingFor(kind);
+        if (direct.Count > 0)
+        {
+            var found = new DirectSaveScanner(
+                IPlatformApplication.Current!.Services.GetRequiredService<Domain.ISaveEngine>()).Scan(kind);
+            if (found.Count > 0)
+            {
+                _viewModel.Status = AppStrings.Fr
+                    ? $"{SaveDescriptions.EmulatorName(kind)} : {found.Count} sauvegarde(s) trouvée(s) dans {direct.Count} dossier(s) standard(s)."
+                    : $"{SaveDescriptions.EmulatorName(kind)}: {found.Count} save(s) found in {direct.Count} standard folder(s).";
+                return;
+            }
+        }
         var command = AddCommand(kind);
         if (command is null)
         {
             _viewModel.Status = $"{SaveDescriptions.EmulatorName(kind)}: {AppStrings.NotLinked}.";
             return;
         }
+        // Nothing in the standard folders: the SAF flow says which folder it wants.
+        var folders = EmulatorSaveFolders.For(kind);
+        _viewModel.Status = AppStrings.Fr
+            ? $"Dossiers standards introuvables pour {SaveDescriptions.EmulatorName(kind)}. Le sélecteur s'ouvre : choisissez {string.Join(" / ", folders.Take(3))} sous /storage/emulated/0."
+            : $"No standard folders for {SaveDescriptions.EmulatorName(kind)}. The picker opens: choose {string.Join(" / ", folders.Take(3))} under /storage/emulated/0.";
         await command.ExecuteAsync(null);
         RefreshChips();
     }

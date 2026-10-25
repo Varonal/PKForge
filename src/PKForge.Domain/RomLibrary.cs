@@ -106,6 +106,9 @@ public sealed record LibraryRom(
     /// <summary>The file's last-modified time, so rescans can skip unchanged files.</summary>
     DateTimeOffset? LastModified = null)
 {
+    /// <summary>The Pokémon generation the parsed game name belongs to (0 when unknown).</summary>
+    public int Generation => RomNameRules.GenerationOf(GameName);
+
     /// <summary>The extension including the dot, lower-case.</summary>
     public string Extension
     {

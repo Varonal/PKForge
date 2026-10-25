@@ -9,10 +9,16 @@
     <package android:name="com.retroarch.aarch64" />
     <package android:name="com.retroarch.ra32" />
     <package android:name="me.magnum.melonds" />
+    <package android:name="io.github.melonds" />
     <package android:name="io.github.lime3ds.android" />
     <package android:name="io.github.azahar" />
+    <package android:name="org.azahar.azahar" />
     <package android:name="org.citra.emu" />
     <package android:name="dev.eden.eden_emulator" />
+    <package android:name="org.sudachi.sudachi_emu" />
+    <package android:name="org.yuzu.yuzu_emu" />
+    <package android:name="org.ryujinx" />
+    <package android:name="com.skyline.emu" />
     <package android:name="dev.eden.eden_emulator.dualscreen" />
     <package android:name="org.dolphinemu.dolphin" />
     <package android:name="com.dsemu.drastic" />

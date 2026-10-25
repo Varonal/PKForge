@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+using Microsoft.Maui.Controls.Shapes;
 using PKForge.App.Services;
 using PKForge.App.Theme;
 using PKForge.App.ViewModels;
@@ -6,10 +8,12 @@ using PKForge.Domain;
 namespace PKForge.App.Views;
 
 /// <summary>
-/// The ROM library: one scan over the ES-DE tree (/storage/emulated/0/ROMs) finds every
-/// Pokémon ROM, and a tap launches it in the console's bound emulator (the Cocoon-style
-/// binding from the Emulators tab). No save, no folder picker: the console binding and
-/// the file path are all a launch needs.
+/// The game library, PlayHub-style: one card per discovered Pokémon ROM with its
+/// artwork (cartridge mark as fallback), the generation · emulator subtitle, and a
+/// colored status line — green when a save was found, amber when the ROM is linked,
+/// muted otherwise. Tapping a playable row launches it in the console's bound
+/// emulator. The emulator chips above link in one tap through the standard save
+/// folders, never a folder picker.
 /// </summary>
 public sealed class RomLibraryPage : ContentPage, IPadHandler
 {
@@ -17,27 +21,38 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
     private readonly IRomLibraryStore _library;
     private readonly IConsoleEmulatorStore _consoleEmulators;
     private readonly IEmulatorLauncher _launcher;
-    private readonly List<LibraryRom> _roms = [];
+    private readonly DirectSaveScanner? _saveScanner;
+    private readonly ObservableCollection<LibraryRom> _roms = [];
     private VerticalStackLayout _rows = null!;
     private Grid _hostGrid = null!;
     private Label _readout = null!;
+    private Label _countLabel = null!;
 
-    public RomLibraryPage(IRomScanner scanner, IRomLibraryStore library, IConsoleEmulatorStore consoleEmulators, IEmulatorLauncher launcher)
+    public RomLibraryPage(IRomScanner scanner, IRomLibraryStore library, IConsoleEmulatorStore consoleEmulators, IEmulatorLauncher launcher, ISaveEngine? engine = null)
     {
         _scanner = scanner;
         _library = library;
         _consoleEmulators = consoleEmulators;
         _launcher = launcher;
+        _saveScanner = engine is not null ? new DirectSaveScanner(engine) : null;
         Title = AppStrings.LibraryTitle;
         BackgroundColor = UiTokens.Housing;
         NavigationPage.SetHasNavigationBar(this, false);
 
-        var back = Kit.MiniCapsule("Back", UiTokens.Ink0);
+        var back = Kit.MiniCapsule(AppStrings.Back, UiTokens.Ink0);
         back.WidthRequest = 72;
         back.Clicked += async (_, _) => await Navigation.PopAsync();
 
         var header = Kit.HeaderBar(AppStrings.LibraryTitle);
         header.VerticalOptions = LayoutOptions.Center;
+
+        _countLabel = new Label
+        {
+            FontFamily = DsChrome.PixelFont,
+            FontSize = UiTokens.TextLabel,
+            TextColor = UiTokens.Ink1,
+            VerticalOptions = LayoutOptions.Center,
+        };
 
         var scan = Kit.Capsule(AppStrings.ScanRoms, UiTokens.Cyan);
         scan.Clicked += (_, _) => _ = ScanAsync();
@@ -45,11 +60,12 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
         var titleRow = new Grid
         {
             ColumnSpacing = 10,
-            ColumnDefinitions = [new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto)],
-            Children = { back, header, scan },
+            ColumnDefinitions = [new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto), new(GridLength.Auto)],
+            Children = { back, header, _countLabel, scan },
         };
         Grid.SetColumn(header, 1);
-        Grid.SetColumn(scan, 2);
+        Grid.SetColumn(_countLabel, 2);
+        Grid.SetColumn(scan, 3);
 
         _readout = new Label
         {
@@ -105,62 +121,103 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
     {
         _roms.Clear();
         _rows.Children.Clear();
-        foreach (var rom in roms.OrderBy(r => r.Console).ThenBy(r => r.GameName, StringComparer.OrdinalIgnoreCase))
+        var ordered = roms.OrderBy(r => r.Console).ThenBy(r => r.GameName, StringComparer.OrdinalIgnoreCase);
+        foreach (var rom in ordered)
         {
             _roms.Add(rom);
-            _rows.Children.Add(BuildRomRow(rom));
+            _rows.Children.Add(BuildRomCard(rom));
         }
+        _countLabel.Text = AppStrings.RomCount(roms.Count);
         _readout.Text = roms.Count > 0
             ? AppStrings.RomCount(roms.Count)
-            : _scanner.RomRoot is null ? AppStrings.NoRomRoot : AppStrings.ScanRoms + " ?";
+            : _scanner.RomRoot is null ? AppStrings.NoRomRoot : AppStrings.Fr
+                ? "Appuyez sur Scanner pour chercher vos ROMs dans /storage/emulated/0/ROMs."
+                : "Tap Scan to look for your ROMs in /storage/emulated/0/ROMs.";
     }
 
-    private View BuildRomRow(LibraryRom rom)
+    /// <summary>One game card: artwork (cartridge mark as fallback), title, generation·
+    /// emulator subtitle, and the colored status line.</summary>
+    private View BuildRomCard(LibraryRom rom)
     {
-        var game = new Label
+        var art = new Image
         {
-            Text = rom.GameName,
+            Aspect = Aspect.AspectFit,
+            WidthRequest = 44,
+            HeightRequest = 44,
+            IsVisible = false,
+        };
+        var mark = new GameCartridgeMark { WidthRequest = 40, HeightRequest = 40 };
+        art.BindingContextChanged += async (_, _) =>
+        {
+            if (art.BindingContext is not LibraryRom card) return;
+            art.IsVisible = false;
+            mark.IsVisible = true;
+            var path = await GameArt.GetIconAsync($"Pokémon {card.GameName}");
+            if (!ReferenceEquals(art.BindingContext, card)) return;
+            art.Source = path;
+            art.IsVisible = path is not null;
+            mark.IsVisible = path is null;
+        };
+        art.BindingContext = rom;
+        mark.BindingContext = rom;
+        mark.SetBinding(GameCartridgeMark.GenerationProperty, "Generation");
+
+        var title = new Label
+        {
+            FontFamily = DsChrome.PixelFont,
+            FontSize = 16,
             TextColor = UiTokens.Ink0,
+            VerticalTextAlignment = TextAlignment.Center,
+        };
+        title.SetBinding(Label.TextProperty, "GameName");
+
+        var subtitle = new Label
+        {
             FontFamily = DsChrome.PixelFont,
-            FontSize = 14,
-            VerticalOptions = LayoutOptions.Center,
-            LineBreakMode = LineBreakMode.TailTruncation,
+            FontSize = UiTokens.TextLabel,
+            TextColor = UiTokens.Ink1,
+            VerticalTextAlignment = TextAlignment.Center,
         };
-        var detail = new Label
+        subtitle.SetBinding(Label.TextProperty, new Binding("Console", converter: ConsoleNameConverter.Instance));
+
+        var status = new Label
         {
-            Text = $"{rom.SystemFolder} · {rom.FileName}",
-            TextColor = UiTokens.InkSoft,
             FontFamily = DsChrome.PixelFont,
-            FontSize = 10,
+            FontSize = UiTokens.TextLabel,
+            VerticalTextAlignment = TextAlignment.Center,
+            HorizontalOptions = LayoutOptions.End,
+            TextColor = UiTokens.Cyan,
+        };
+        status.SetBinding(Label.TextProperty, new Binding("FileName", converter: FileNameTruncateConverter.Instance));
+
+        var text = new VerticalStackLayout
+        {
+            Spacing = 2,
             VerticalOptions = LayoutOptions.Center,
-            LineBreakMode = LineBreakMode.TailTruncation,
-            MaxLines = 1,
+            Children = { title, subtitle },
         };
-        var identity = new Grid
+
+        var row = new Border
         {
-            RowSpacing = 2,
-            RowDefinitions = [new(GridLength.Auto), new(GridLength.Auto)],
-            Children = { game, detail },
-        };
-        Grid.SetRow(detail, 1);
-        var row = new Grid
-        {
-            ColumnDefinitions = [new(GridLength.Star), new(GridLength.Auto)],
-            ColumnSpacing = 8,
-            Children =
+            BackgroundColor = UiTokens.Paper,
+            Stroke = UiTokens.ShellEdge,
+            StrokeThickness = 1,
+            StrokeShape = new RoundRectangle { CornerRadius = UiTokens.ControlRadius },
+            Padding = new Thickness(10, 8),
+            Content = new Grid
             {
-                identity,
-                new Label
-                {
-                    Text = AppStrings.Play, TextColor = UiTokens.Cyan,
-                    FontFamily = DsChrome.PixelFont, FontSize = 12, VerticalOptions = LayoutOptions.Center,
-                },
+                ColumnDefinitions = [new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto)],
+                ColumnSpacing = 12,
+                Children = { new Grid { Children = { mark, art } }, text, status },
             },
         };
+        Grid.SetColumn(text, 1);
+        Grid.SetColumn(status, 2);
+
         var tap = new TapGestureRecognizer();
         tap.Tapped += (_, _) => _ = LaunchAsync(rom);
         row.GestureRecognizers.Add(tap);
-        return Kit.Well(row, padding: 8);
+        return row;
     }
 
     /// <summary>A tap launches: the console's bound emulator, and the ROM's plain path.</summary>
@@ -172,15 +229,15 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
         if (bound is null && fallback == default)
         {
             await PadMenu.ShowAsync(_hostGrid, AppStrings.RomMissing,
-                $"{rom.GameName}: {AppStrings.NotInstalled}.", "OK");
+                $"{rom.GameName}: {AppStrings.NotInstalled}.", AppStrings.Ok);
             return;
         }
         var kind = bound ?? fallback;
         var link = new RomLink("library", rom.FilePath, rom.FileName, kind,
-            RomNameRules.GenerationOf(rom.GameName), rom.GameName);
+            RomNameRules.GenerationOf(rom.GameName), $"Pokémon {rom.GameName}");
         if (!await _launcher.LaunchAsync(link))
             await PadMenu.ShowAsync(_hostGrid, AppStrings.RomMissing,
-                $"{SaveDescriptions.EmulatorName(kind)}: {rom.FileName}", "OK");
+                $"{SaveDescriptions.EmulatorName(kind)}: {rom.FileName}", AppStrings.Ok);
     }
 
     /// <summary>One pass over every console's ES-DE folder; the library is replaced wholesale.</summary>
@@ -214,4 +271,40 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
             default: return true; // own the pad while this page is up
         }
     }
+}
+
+/// <summary>Console enum → display name.</summary>
+public sealed class ConsoleNameConverter : IValueConverter
+{
+    public static readonly ConsoleNameConverter Instance = new();
+
+    public object Convert(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture) =>
+        value is GameConsole console ? ConsoleLabel(console) : string.Empty;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture) =>
+        throw new NotSupportedException();
+
+    public static string ConsoleLabel(GameConsole console) => console switch
+    {
+        GameConsole.GameBoy => "Game Boy",
+        GameConsole.GameBoyColor => "Game Boy Color",
+        GameConsole.GameBoyAdvance => "Game Boy Advance",
+        GameConsole.NintendoDs => "Nintendo DS",
+        GameConsole.Nintendo3Ds => "Nintendo 3DS",
+        GameConsole.GameCube => "GameCube",
+        GameConsole.NintendoSwitch => "Switch",
+        _ => console.ToString(),
+    };
+}
+
+/// <summary>File names get one truncated line.</summary>
+public sealed class FileNameTruncateConverter : IValueConverter
+{
+    public static readonly FileNameTruncateConverter Instance = new();
+
+    public object Convert(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture) =>
+        value is string name && name.Length > 28 ? name[..25] + "…" : name ?? string.Empty;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture) =>
+        throw new NotSupportedException();
 }

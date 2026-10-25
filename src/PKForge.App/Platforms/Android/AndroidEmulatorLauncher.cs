@@ -1,18 +1,20 @@
 using Android.App;
 using Android.Content;
 using Android.Content.PM;
-using Android.Net;
+using AndroidUri = Android.Net.Uri;
 using PKForge.App.ViewModels;
 using PKForge.Domain;
 
 namespace PKForge.App;
 
 /// <summary>
-/// The Android emulator launcher: resolves installed packages with PackageManager and
-/// hands linked ROMs to emulators the way each one documents (RetroArch's explicit
-/// RetroActivityFuture extras, melonDS's EmulatorActivity PATH extra, a VIEW intent
-/// with a content URI for the rest). Emulators without a documented handoff open their
-/// own library screen, and the status line says so instead of failing silently.
+/// Hands a linked ROM to its emulator, the way each one documents it. Every launch
+/// carries a URI: content:// ids from the SAF picker pass through, plain paths from
+/// the ROM library become file:// URIs. RetroArch gets its full content-loading extra
+/// set (EXTRA_CONTENT + RETROARCH_LOAD_CONTENT_PATH + EXTRA_CORE_PATH + the game
+/// label), the same contract frontends use; standalone emulators get an ACTION_VIEW
+/// with the ROM's MIME type. Emulators without a documented handoff open their own
+/// library screen instead of a black void.
 /// </summary>
 public sealed class AndroidEmulatorLauncher : IEmulatorLauncher
 {
@@ -39,7 +41,7 @@ public sealed class AndroidEmulatorLauncher : IEmulatorLauncher
         var package = app.PackageIds.FirstOrDefault(IsInstalled) ?? app.PrimaryPackage;
         if (!IsInstalled(package))
         {
-            Services.AppLog.Info("launch", $"{SaveDescriptions.EmulatorName(link.Emulator)} is not installed ({package}).");
+            AppLog.Info("launch", $"{SaveDescriptions.EmulatorName(link.Emulator)} is not installed ({package}).");
             return false;
         }
         if (app.LaunchStyle == RomLaunchStyle.OpenAppOnly)
@@ -47,16 +49,25 @@ public sealed class AndroidEmulatorLauncher : IEmulatorLauncher
             // No documented handoff: the emulator's own library is the launch surface.
             return await OpenAppAsync(link.Emulator, cancellationToken).ConfigureAwait(true);
         }
+
+        // One URI per launch: content ids pass through, plain paths become file://.
+        var rom = ResolveUri(link.RomUri);
+        if (rom is null)
+        {
+            AppLog.Info("launch", $"The linked ROM cannot be read: {link.RomUri}");
+            return false;
+        }
+
         var activity = Platform.CurrentActivity ?? throw new InvalidOperationException("No foreground Android activity is available.");
-        var intent = BuildIntent(app.LaunchStyle, package, link);
-        return await StartActivityAsync(activity, intent, link).ConfigureAwait(true);
+        var intent = BuildIntent(app.LaunchStyle, package, rom, link);
+        if (intent is null) return await OpenAppAsync(link.Emulator, cancellationToken).ConfigureAwait(true);
+        return StartActivity(activity, intent, link);
     }
 
     public Task<bool> OpenAppAsync(EmulatorKind kind, CancellationToken cancellationToken = default)
     {
         var activity = Platform.CurrentActivity ?? throw new InvalidOperationException("No foreground Android activity is available.");
         var app = EmulatorCatalog.App(kind);
-        var package = app.PackageIds.FirstOrDefault(IsInstalled) ?? app.PrimaryPackage;
         var manager = activity.PackageManager!;
         var opened = false;
         foreach (var id in app.PackageIds.Where(IsInstalled))
@@ -74,69 +85,94 @@ public sealed class AndroidEmulatorLauncher : IEmulatorLauncher
             catch (Java.Lang.SecurityException) { }
         }
         if (!opened)
-            Services.AppLog.Info("launch", $"Could not open {SaveDescriptions.EmulatorName(kind)} ({package}): no launchable activity.");
+            AppLog.Info("launch", $"Could not open {SaveDescriptions.EmulatorName(kind)}: no launchable activity.");
         return Task.FromResult(opened);
     }
 
-    /// <summary>The exact intent the emulator documents for a direct ROM handoff.</summary>
-    private static Intent BuildIntent(RomLaunchStyle style, string package, RomLink link) => style switch
+    /// <summary>content:// ids pass through; plain file paths become file:// URIs that
+    /// exist on disk; anything unreadable returns null (the launch says so).</summary>
+    private static AndroidUri? ResolveUri(string romUri)
     {
-        RomLaunchStyle.RetroArch => RetroArchIntent(package, link),
-        RomLaunchStyle.PathExtra => EmulatorActivityIntent(package, link),
-        RomLaunchStyle.UriData => ViewIntent(package, link),
-        _ => ViewIntent(package, link),
+        if (romUri.StartsWith("content://", StringComparison.Ordinal))
+            return AndroidUri.Parse(romUri);
+        try
+        {
+            if (!File.Exists(romUri)) return null;
+            return AndroidUri.FromFile(new Java.IO.File(romUri));
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>The intent the emulator documents for a direct ROM handoff.</summary>
+    private static Intent? BuildIntent(RomLaunchStyle style, string package, AndroidUri rom, RomLink link) => style switch
+    {
+        RomLaunchStyle.RetroArch => RetroArchIntent(package, rom, link),
+        RomLaunchStyle.PathExtra => ViewIntent(package, rom),
+        RomLaunchStyle.UriData => ViewIntent(package, rom),
+        _ => null,
     };
 
-    private static Intent RetroArchIntent(string package, RomLink link)
+    /// <summary>
+    /// RetroArch's documented content-loading contract: MAIN + LAUNCHER with the ROM as
+    /// data, plus the EXTRA_CONTENT / RETROARCH_LOAD_CONTENT_PATH pair, the game label
+    /// and a core path hint. The core path names RetroArch's own core directory; when
+    /// the file is absent RetroArch falls back to its own core pairing, so the game
+    /// still loads rather than showing a black screen.
+    /// </summary>
+    private static Intent RetroArchIntent(string package, AndroidUri rom, RomLink link)
     {
-        // RetroArch runs everything from one activity; ROM and LIBRETRO name the content.
-        // The activity class is com.retroarch.browser.retroactivity.RetroActivityFuture in
-        // every build (com.retroarch, .aarch64, .ra32); only the package differs.
-        var intent = new Intent();
-        intent.SetComponent(new ComponentName(package, "com.retroarch.browser.retroactivity.RetroActivityFuture"));
-        intent.SetAction(Intent.ActionMain);
+        var intent = new Intent(Intent.ActionMain, rom);
+        intent.SetPackage(package);
         intent.AddCategory(Intent.CategoryLauncher);
-        intent.AddFlags(ActivityFlags.NewTask);
-        intent.PutExtra("ROM", RomPathFor(link));
+        intent.SetDataAndType(rom, "application/octet-stream");
+        intent.PutExtra("RETROARCH_LOAD_CONTENT_PATH", rom.ToString());
+        intent.PutExtra("EXTRA_CONTENT", rom.ToString());
+        intent.PutExtra("EXTRA_GAME_LABEL", link.GameLabel);
+        var core = CorePathHint(link.Generation, package);
+        if (core is not null) intent.PutExtra("EXTRA_CORE_PATH", core);
         return intent;
     }
 
-    private static Intent EmulatorActivityIntent(string package, RomLink link)
+    /// <summary>The core RetroArch pairs with the ROM's generation, inside its own
+    /// package directory (each RetroArch build owns its core dir; null lets RetroArch
+    /// choose, which never black-screens).</summary>
+    private static string? CorePathHint(int generation, string package)
     {
-        // melonDS's EmulatorActivity takes a PATH extra (its documented frontend contract).
-        var intent = new Intent(Intent.ActionView);
-        intent.SetComponent(new ComponentName(package, $"{package}.ui.emulator.EmulatorActivity"));
-        intent.PutExtra("PATH", RomPathFor(link));
-        intent.AddFlags(ActivityFlags.NewTask);
-        return intent;
+        if (generation is not (1 or 2 or 3)) return null; // DS cores are opt-in; RetroArch pairs on its own
+        var coreFile = EmulatorCatalog.CoreForGeneration(generation) switch
+        {
+            RetroArchCore.Gambatte => "gambatte_libretro_android.so",
+            RetroArchCore.MGba => "mgba_libretro_android.so",
+            _ => null,
+        };
+        return coreFile is null ? null : $"/data/data/{package}/cores/{coreFile}";
     }
 
-    private static Intent ViewIntent(string package, RomLink link)
+    /// <summary>The standalone emulators' contract: ACTION_VIEW with the ROM as data.</summary>
+    private static Intent ViewIntent(string package, AndroidUri rom)
     {
         var intent = new Intent(Intent.ActionView);
         intent.SetPackage(package);
-        intent.SetDataAndType(ParseUri(link.RomUri), "*/*");
-        intent.AddFlags(ActivityFlags.GrantReadUriPermission | ActivityFlags.NewTask | ActivityFlags.ClearTop);
+        intent.SetDataAndType(rom, "application/octet-stream");
         return intent;
     }
 
-    /// <summary>
-    /// SAF document ids are file://-shaped paths on primary storage; emulators on Android
-    /// only accept plain file paths (they have no SAF bridge), so the id is handed over as-is.
-    /// </summary>
-    private static string RomPathFor(RomLink link) =>
-        link.RomUri.StartsWith("file://", StringComparison.Ordinal)
-            ? link.RomUri["file://".Length..]
-            : link.RomUri;
-
-    private static Android.Net.Uri ParseUri(string uri) => Android.Net.Uri.Parse(uri)
-        ?? throw new InvalidOperationException($"The linked ROM URI could not be parsed: {uri}");
-
-    private static Task<bool> StartActivityAsync(Activity activity, Intent intent, RomLink link)
+    /// <summary>Starts the intent; false when no activity accepted it or the ROM grant failed.</summary>
+    private static bool StartActivity(Activity activity, Intent intent, RomLink link)
     {
         bool started;
         try
         {
+            // The ROM grant rides along: Android re-grants read access to the target app.
+            intent.AddFlags(ActivityFlags.GrantReadUriPermission | ActivityFlags.NewTask);
+            if (intent.ResolveActivity(activity.PackageManager!) is null)
+            {
+                AppLog.Info("launch", $"No activity in the target emulator accepts the ROM handoff ({link.Emulator}).");
+                return false;
+            }
             activity.StartActivity(intent);
             started = true;
         }
@@ -148,9 +184,9 @@ public sealed class AndroidEmulatorLauncher : IEmulatorLauncher
         {
             started = false;
         }
-        Services.AppLog.Info("launch", started
+        AppLog.Info("launch", started
             ? $"Launched {link.RomFileName} in {SaveDescriptions.EmulatorName(link.Emulator)}."
             : $"No activity accepted the launch of {link.RomFileName} ({link.Emulator}).");
-        return Task.FromResult(started);
+        return started;
     }
 }
