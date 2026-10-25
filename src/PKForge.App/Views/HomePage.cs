@@ -33,7 +33,7 @@ public sealed class HomePage : ContentPage, IPadHandler
         // GAMES section: the cartridge shelf (reused), labelled DS-style.
         var gamesLabel = new Label
         {
-            Text = "Games", FontFamily = DsChrome.PixelFont, FontSize = UiTokens.TextTitle,
+            Text = AppStrings.Games, FontFamily = DsChrome.PixelFont, FontSize = UiTokens.TextTitle,
             TextColor = UiTokens.Ink0, VerticalOptions = LayoutOptions.Center,
         };
         var filterCaption = new Label
@@ -83,15 +83,15 @@ public sealed class HomePage : ContentPage, IPadHandler
         BlockNativeFocus(_shelf);
 
         // The three destinations as PKSM tiles with bundled pixel icons.
-        var bank = new DsCard("bank", "Bank") { Tapped = () => _ = PushAsync<BankPage>() };
-        var autopilot = new DsCard("pokedex", "Dex Autopilot") { Tapped = () => _ = OpenAutopilotAsync() };
-        var park = new DsCard("park", "Poképark") { Tapped = () => _ = PushParkAsync() };
-        var events = new DsCard("events", "Events") { Tapped = () => _ = ShowEventsMenuAsync() };
-        var emulators = new DsCard("retroarch", "Emulators") { Tapped = () => _ = PushAsync<EmulatorsPage>() };
+        var bank = new DsCard("bank", AppStrings.Bank) { Tapped = () => _ = PushAsync<BankPage>() };
+        var autopilot = new DsCard("pokedex", AppStrings.DexAutopilot) { Tapped = () => _ = OpenAutopilotAsync() };
+        var park = new DsCard("park", AppStrings.Pokepark) { Tapped = () => _ = PushParkAsync() };
+        var events = new DsCard("events", AppStrings.Events) { Tapped = () => _ = ShowEventsMenuAsync() };
+        var emulators = new DsCard("retroarch", AppStrings.EmulatorsTitle) { Tapped = () => _ = PushAsync<EmulatorsPage>() };
         var library = new DsCard("platform-gba", "Library") { Tapped = () => _ = PushAsync<RomLibraryPage>() };
         var trophies = new DsCard("ribbons", "Trophies") { Tapped = () => _ = PushAsync<TrophiesPage>() };
         var awards = new DsCard("credits", "Awards") { Tapped = () => _ = PushAsync<RetroAchievementsPage>() };
-        var settings = new DsCard("settings", "Settings") { Tapped = () => _ = ShowSettingsAsync() };
+        var settings = new DsCard("settings", AppStrings.Settings) { Tapped = () => _ = ShowSettingsAsync() };
         _cards = [bank, autopilot, park, events, emulators, library, trophies, awards, settings];
         foreach (var card in _cards) BlockNativeFocus(card);
         var cards = new Grid
@@ -120,14 +120,14 @@ public sealed class HomePage : ContentPage, IPadHandler
         var bodyHost = new Grid { Children = { DsChrome.GridBackground(), body } };
 
         var footer = DsChrome.Footer(
-            ("A", "Open", () => OnPadButton(PadButton.A)),
+            ("A", AppStrings.Open, () => OnPadButton(PadButton.A)),
             // The cartridge identity menu (rename, color, which game): B on the pad, a hold by touch.
-            ("B", "Edit game · hold", () =>
+            ("B", AppStrings.EditGameHold, () =>
             {
                 if ((uint)_shelfIndex < (uint)_viewModel.Groups.Count) _ = ShowSaveMenuAsync(_viewModel.Groups[_shelfIndex]);
             }),
-            ("L", "Filter", () => _ = ShowFilterMenuAsync()),
-            ("Y", "Link", () => _ = ShowLinkMenuAsync()),
+            ("L", AppStrings.Filter, () => _ = ShowFilterMenuAsync()),
+            ("Y", AppStrings.Link, () => _ = ShowLinkMenuAsync()),
             ("X", "File", () => _ = LinkFileAsync()),
             ("+", "Settings", () => _ = ShowSettingsAsync()));
 
@@ -304,14 +304,14 @@ public sealed class HomePage : ContentPage, IPadHandler
                     "Now then... let's find your games!");
 
                 var choice = await PadMenu.ShowAsync(_hostGrid, "Get started", null,
-                    new PadOption("Link an emulator", IconPath: "link", Detail: "Pick the emulator folder where your games keep their saves."),
-                    new PadOption("Open a single save file", IconPath: "file", Detail: "Pick one save file instead of a whole emulator folder."),
+                    new PadOption(AppStrings.LinkEmulator, IconPath: "link", Detail: Fr ? "Choisissez le dossier où vos jeux gardent leurs sauvegardes." : "Pick the emulator folder where your games keep their saves."),
+                    new PadOption(AppStrings.OpenSingleSave, IconPath: "file", Detail: Fr ? "Choisissez un seul fichier de sauvegarde plutôt qu'un dossier entier." : "Pick one save file instead of a whole emulator folder."),
                     new PadOption($"Download the sprite pack ({SpritePackDownloader.SizeHint})", IconPath: "download", Detail: "Animated sprites, HOME pictures and item icons, to use offline."),
                     new PadOption("Maybe later", IconPath: "close"));
                 switch (choice)
                 {
-                    case "Link an emulator": await ShowLinkMenuAsync(); break;
-                    case "Open a single save file": await LinkFileAsync(); break;
+                    case var link when link == AppStrings.LinkEmulator: await ShowLinkMenuAsync(); break;
+                    case var single when single == AppStrings.OpenSingleSave: await LinkFileAsync(); break;
                     case var pack when pack?.StartsWith("Download the sprite pack", StringComparison.Ordinal) == true:
                         await DownloadSpritePackAsync();
                         break;
@@ -456,10 +456,10 @@ public sealed class HomePage : ContentPage, IPadHandler
     /// or plain alphabetical.</summary>
     private async Task ShowFilterMenuAsync()
     {
-        var choice = await PadMenu.ShowAsync(_hostGrid, "Filter games", null,
-            new PadOption("All games", IconPath: "all"),
-            new PadOption("Release order", IconPath: "calendar", Detail: "Every game, from the oldest release to the newest."),
-            new PadOption("Alphabetical (A-Z)", IconPath: "alpha"),
+        var choice = await PadMenu.ShowAsync(_hostGrid, AppStrings.FilterGames, null,
+            new PadOption(AppStrings.AllGames, IconPath: "all"),
+            new PadOption(AppStrings.ReleaseOrder, IconPath: "calendar", Detail: AppStrings.Fr ? "Tous les jeux, de la plus ancienne à la plus récente sortie." : "Every game, from the oldest release to the newest."),
+            new PadOption(AppStrings.Alphabetical, IconPath: "alpha"),
             new PadOption("Game Boy (Gen I-II)", IconPath: "platform-gb"),
             new PadOption("GBA (Gen III)", IconPath: "platform-gba"),
             new PadOption("DS (Gen IV-V)", IconPath: "platform-ds"),
@@ -476,9 +476,9 @@ public sealed class HomePage : ContentPage, IPadHandler
             new PadOption("Gen IX", IconPath: "generation"));
         var (key, caption) = choice switch
         {
-            "All games" => ("all", "All"),
-            "Release order" => ("release", "Release"),
-            "Alphabetical (A-Z)" => ("az", "A-Z"),
+            var all when all == AppStrings.AllGames => ("all", AppStrings.All),
+            var release when release == AppStrings.ReleaseOrder => ("release", AppStrings.Fr ? "Sortie" : "Release"),
+            var az when az == AppStrings.Alphabetical => ("az", "A-Z"),
             "Game Boy (Gen I-II)" => ("gb", "Game Boy"),
             "GBA (Gen III)" => ("gba", "GBA"),
             "DS (Gen IV-V)" => ("ds", "DS"),
@@ -496,7 +496,7 @@ public sealed class HomePage : ContentPage, IPadHandler
     /// <summary>A cartridge with one save opens it; a shared cartridge asks which save first.</summary>
     private async Task OpenCardAsync(SaveCard card)
     {
-        var save = await ChooseSaveAsync(card, "Which save do you want to open?");
+        var save = await ChooseSaveAsync(card, AppStrings.WhichSaveToOpen);
         if (save is not null) await OpenSaveAsync(save);
     }
 
@@ -551,16 +551,16 @@ public sealed class HomePage : ContentPage, IPadHandler
     {
         while (true)
         {
-            var platform = await PadMenu.ShowAsync(_hostGrid, "Link a storage unit", "Choose a platform to see its emulators.",
+            var platform = await PadMenu.ShowAsync(_hostGrid, AppStrings.LinkStorageUnit, AppStrings.ChoosePlatform,
                 new PadOption("Game Boy / Game Boy Color", IconPath: "platform-gb"),
                 new PadOption("Game Boy Advance", IconPath: "platform-gba"),
                 new PadOption("Nintendo DS", IconPath: "platform-ds"),
                 new PadOption("GameCube", IconPath: "platform-gc"),
                 new PadOption("Nintendo 3DS", IconPath: "azahar"),
                 new PadOption("Nintendo Switch", IconPath: "eden"),
-                new PadOption("Single save file", IconPath: "file"));
+                new PadOption(AppStrings.SingleSaveFile, IconPath: "file"));
             if (platform is null) return;
-            if (platform == "Single save file") { await LinkFileAsync(); return; }
+            if (platform == AppStrings.SingleSaveFile) { await LinkFileAsync(); return; }
             var options = platform switch
             {
                 "Game Boy / Game Boy Color" => new[]
@@ -626,12 +626,12 @@ public sealed class HomePage : ContentPage, IPadHandler
     private async Task ShowSettingsAsync()
     {
         var hiddenCount = _viewModel.HiddenSaves.Count;
-        var hiddenOption = $"Show hidden saves ({hiddenCount})";
+        var hiddenOption = AppStrings.ShowHiddenSaves(hiddenCount);
         var options = new List<PadOption>
         {
-            new("Link an emulator", IconPath: "link", Detail: "Pick the emulator folder where your games keep their saves."),
-            new("Manage linked storage", IconPath: "sdcard", Detail: "Unlink emulator folders. Your files stay on the device."),
-            new("Open a save file", IconPath: "file", Detail: "Pick one save file instead of a whole emulator folder."),
+            new(AppStrings.LinkEmulator, IconPath: "link", Detail: Fr ? "Choisissez le dossier où vos jeux gardent leurs sauvegardes." : "Pick the emulator folder where your games keep their saves."),
+            new(AppStrings.ManageLinkedStorage, IconPath: "sdcard", Detail: Fr ? "Déliez les dossiers d'émulateurs. Vos fichiers restent sur la console." : "Unlink emulator folders. Your files stay on the device."),
+            new(AppStrings.OpenSingleSave, IconPath: "file", Detail: Fr ? "Choisissez un seul fichier de sauvegarde plutôt qu'un dossier entier." : "Pick one save file instead of a whole emulator folder."),
         };
         if (hiddenCount > 0) options.Add(new PadOption(hiddenOption, IconPath: "show", Detail: "Saves you hid from Home. Pick one to show it again."));
         var scheme = $"Color scheme: {PKForge.Chrome.ColorTheme.Current.Name}";
@@ -640,12 +640,12 @@ public sealed class HomePage : ContentPage, IPadHandler
         [
             new PadOption(scheme, IconPath: "palette", Detail: "The app's colors: the default blues or a theme for each type."),
             new PadOption(background, IconPath: "box", Detail: "How each PC box shows the wallpaper the game gives it."),
-            new PadOption("Restore points", IconPath: "history", Detail: "The backups made before each write, to put a save back as it was."),
-            new PadOption("About PKForge", IconPath: "info"),
-            new PadOption("Check for update", IconPath: "update"),
-            new PadOption("Music", IconPath: "music", Detail: "Play your own audio files in the background."),
-            new PadOption("Misc", IconPath: "gears", Detail: "Sprite pack, rescan, logs, screen and editing modes."),
-            new PadOption("Quit PKForge", IconPath: "quit"),
+            new PadOption(AppStrings.RestorePoints, IconPath: "history", Detail: Fr ? "Les sauvegardes faites avant chaque écriture, pour remettre une sauvegarde comme avant." : "The backups made before each write, to put a save back as it was."),
+            new PadOption(AppStrings.AboutPkforge, IconPath: "info"),
+            new PadOption(AppStrings.CheckForUpdate, IconPath: "update"),
+            new PadOption(AppStrings.Music, IconPath: "music", Detail: AppStrings.Fr ? "Jouez vos propres fichiers audio en arrière-plan." : "Play your own audio files in the background."),
+            new PadOption(AppStrings.Misc, IconPath: "gears", Detail: AppStrings.Fr ? "Pack de sprites, rescan, logs, écran et modes d'édition." : "Sprite pack, rescan, logs, screen and editing modes."),
+            new PadOption(AppStrings.Quit, IconPath: "quit"),
         ]);
         var choice = await PadMenu.ShowAsync(_hostGrid, "Settings", null, [.. options]);
         if (choice == hiddenOption) { await ShowHiddenSavesAsync(); return; }
@@ -653,16 +653,16 @@ public sealed class HomePage : ContentPage, IPadHandler
         if (choice == background) { await ShowBoxBackgroundAsync(); return; }
         switch (choice)
         {
-            case "Link an emulator": await ShowLinkMenuAsync(); break;
-            case "Manage linked storage": await ShowManageLinkedStorageAsync(); break;
-            case "Open a save file": await LinkFileAsync(); break;
-            case "Restore points": await PushAsync<BackupHistoryPage>(); break;
-            case "About PKForge": await AboutPopup.ShowAsync(_hostGrid); break;
-            case "Check for update": await CheckForUpdateAsync(automatic: false); break;
-            case "Music": await ShowMusicAsync(); break;
-            case "Misc": await ShowMiscAsync(); break;
-            case "Quit PKForge":
-                if (await PadMenu.ConfirmAsync(_hostGrid, "Quit PKForge?", "Unsaved edits in open menus are already backed up per write.", "Quit"))
+            case var link when link == AppStrings.LinkEmulator: await ShowLinkMenuAsync(); break;
+            case var manage when manage == AppStrings.ManageLinkedStorage: await ShowManageLinkedStorageAsync(); break;
+            case var open when open == AppStrings.OpenSingleSave: await LinkFileAsync(); break;
+            case var restore when restore == AppStrings.RestorePoints: await PushAsync<BackupHistoryPage>(); break;
+            case var about when about == AppStrings.AboutPkforge: await AboutPopup.ShowAsync(_hostGrid); break;
+            case var update when update == AppStrings.CheckForUpdate: await CheckForUpdateAsync(automatic: false); break;
+            case var music when music == AppStrings.Music: await ShowMusicAsync(); break;
+            case var misc when misc == AppStrings.Misc: await ShowMiscAsync(); break;
+            case var quit when quit == AppStrings.Quit:
+                if (await PadMenu.ConfirmAsync(_hostGrid, AppStrings.QuitPkforge, AppStrings.Fr ? "Les modifications non enregistrées des menus ouverts sont déjà sauvegardées à chaque écriture." : "Unsaved edits in open menus are already backed up per write.", AppStrings.Quit))
                     Microsoft.Maui.Controls.Application.Current?.Quit();
                 break;
         }
@@ -889,16 +889,16 @@ public sealed class HomePage : ContentPage, IPadHandler
     private async Task ShowMiscAsync()
     {
         var trainerProfiles = IPlatformApplication.Current!.Services.GetRequiredService<TrainerProfileStore>();
-        var choice = await PadMenu.ShowAsync(_hostGrid, "Misc", null,
+        var choice = await PadMenu.ShowAsync(_hostGrid, AppStrings.Misc, null,
             new PadOption(trainerProfiles.UseCurrentTrainerForGeneration
                 ? "Generated Pokémon obey trainer: ON"
                 : "Generated Pokémon obey trainer: OFF", IconPath: "profile",
                 Detail: "ON makes Pokémon you create belong to the open save's trainer."),
             new PadOption($"Download full sprite pack ({SpritePackDownloader.SizeHint})", IconPath: "download", Detail: "Animated sprites, HOME pictures and item icons, to use offline."),
-            new PadOption("Rescan games", IconPath: "refresh", Detail: "Look through your linked folders for saves again."),
-            new PadOption("Scan report", IconPath: "report", Detail: "What the last scan found in each folder, to copy and send us."),
-            new PadOption("Share logs", IconPath: "export", Detail: "Crash reports and recent activity, to send us when something goes wrong."),
-            new PadOption(SecondScreenMode.UserOff ? "Second screen: OFF" : "Second screen: ON", IconPath: "compact",
+            new PadOption(AppStrings.RescanGames, IconPath: "refresh", Detail: AppStrings.Fr ? "Parcourt de nouveau vos dossiers liés à la recherche de sauvegardes." : "Look through your linked folders for saves again."),
+            new PadOption(AppStrings.ScanReport, IconPath: "report", Detail: AppStrings.Fr ? "Ce que le dernier scan a trouvé dans chaque dossier, à copier et nous envoyer." : "What the last scan found in each folder, to copy and send us."),
+            new PadOption(AppStrings.ShareLogs, IconPath: "export", Detail: AppStrings.Fr ? "Rapports de crash et activité récente, à nous envoyer quand quelque chose cloche." : "Crash reports and recent activity, to send us when something goes wrong."),
+            new PadOption(SecondScreenMode.UserOff ? AppStrings.SecondScreenOff : AppStrings.SecondScreenOn, IconPath: "compact",
                 Detail: "OFF keeps PKForge on one screen, so the other stays free (an emulator, say)."),
             new PadOption(Services.HaXMode.IsOn ? "HaX mode: ON" : "HaX mode: OFF", IconPath: "hax",
                 Detail: "ON lets pickers offer any option, even illegal ones."),
@@ -915,17 +915,17 @@ public sealed class HomePage : ContentPage, IPadHandler
             case var pack when pack?.StartsWith("Download full sprite pack", StringComparison.Ordinal) == true:
                 await DownloadSpritePackAsync();
                 break;
-            case "Rescan games":
+            case var rescan when rescan == AppStrings.RescanGames:
                 if (_viewModel.IsBusy && !_viewModel.ReleaseIfStuck())
                 {
-                    await PadMenu.ShowAsync(_hostGrid, "Still busy",
+                    await PadMenu.ShowAsync(_hostGrid, AppStrings.Fr ? "Toujours occupé" : "Still busy",
                         $"PKForge is still busy with {_viewModel.BusyWith}. Try again in a moment; if it stays stuck, close and reopen PKForge.", "OK");
                     break;
                 }
                 // Called directly: the command refuses to start while an older run it owns is still pending.
                 await _viewModel.RescanAsync();
                 break;
-            case "Share logs":
+            case var shareLogs when shareLogs == AppStrings.ShareLogs:
                 await ShareLogsAsync();
                 break;
             case "Second screen: ON" or "Second screen: OFF":
