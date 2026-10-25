@@ -208,6 +208,43 @@ public static class AppStrings
     public static string RestoreAnyway => Fr ? "Restaurer quand même" : "Restore anyway";
     public static string CancelKeepCurrent => Fr ? "Annuler (garder la sauvegarde actuelle)" : "Cancel (keep current save)";
 
+    // ---- Box editor: shared buttons and actions ----
+    public static string CancelLabel => Fr ? "Annuler" : "Cancel";
+    public static string Apply => Fr ? "Appliquer" : "Apply";
+    public static string Delete => Fr ? "Supprimer" : "Delete";
+    public static string Duplicate => Fr ? "Dupliquer" : "Duplicate";
+    public static string Release => Fr ? "Relâcher" : "Release";
+    public static string MoveLabel => Fr ? "Déplacer" : "Move";
+    public static string SortLabel => Fr ? "Trier" : "Sort";
+    public static string Heal => Fr ? "Soigner" : "Heal";
+    public static string EditLabel => Fr ? "Modifier" : "Edit";
+    public static string SendToBank => Fr ? "Envoyer vers la Banque" : "Send to Bank";
+    public static string CopyToBank => Fr ? "Copier vers la Banque" : "Copy to Bank";
+    public static string CopyToAnotherGame => Fr ? "Copier vers un autre jeu…" : "Copy to another game…";
+    public static string BoxManager => Fr ? "Gestion des boîtes…" : "Box manager…";
+    public static string BatchEditor => Fr ? "Éditeur par lot" : "Batch editor";
+    public static string LegalizeAll => Fr ? "Légaliser tout l'illégal" : "Legalize all illegal";
+    public static string Legalizing => Fr ? "Légalisation…" : "Legalizing…";
+    public static string LegalityCheck => Fr ? "Vérification de légalité" : "Legality check";
+    public static string SaveChanges => Fr ? "ENREGISTRER" : "SAVE CHANGES";
+    public static string RibbonAlbum => Fr ? "Album de rubans" : "Ribbon album";
+    public static string HeldItem => Fr ? "Objet tenu" : "Held item";
+    public static string MaxFriendship => Fr ? "Amitié max" : "Max friendship";
+    public static string ImportShowdown => Fr ? "Importer une équipe Showdown" : "Import Showdown team";
+    public static string PasteShowdown => Fr ? "Coller un set Showdown" : "Paste a Showdown set";
+    public static string CopyToClipboard => Fr ? "Copier dans le presse-papiers" : "Copy to clipboard";
+    public static string AuditReport => Fr ? "Rapport d'audit" : "Audit report";
+    public static string NuzlockeReport => Fr ? "Rapport Nuzlocke" : "Nuzlocke report";
+    public static string EmptySelectedBoxes => Fr ? "Vider les boîtes sélectionnées" : "Empty selected boxes";
+    public static string ExportSave => Fr ? "Exporter la sauvegarde modifiée" : "Export modified save";
+    public static string ThisBox => Fr ? "Cette boîte" : "This box";
+    public static string AllBoxes => Fr ? "Toutes les boîtes" : "All boxes";
+    public static string MyPresets => Fr ? "Mes présets d'objets" : "My item presets";
+    public static string SaveBagPreset => Fr ? "Enregistrer la sacoche actuelle comme préset" : "Save current bag as preset";
+    public static string RngIvs => Fr ? "RNG / IVs" : "RNG / IVs";
+    public static string RemoveItems => Fr ? "Retirer tous les objets de cette poche" : "Remove every item in this pouch";
+    public static string WonderCardsLabel => Fr ? "Wonder cards" : "Wonder cards";
+
     // ---- Platform names (menu Link) ----
     public static string PlatformGbGbc => Fr ? "Game Boy / Game Boy Color" : "Game Boy / Game Boy Color";
     public static string PlatformGba => "Game Boy Advance";
