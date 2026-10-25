@@ -121,11 +121,19 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
     {
         _roms.Clear();
         _rows.Children.Clear();
-        var ordered = roms.OrderBy(r => r.Console).ThenBy(r => r.GameName, StringComparer.OrdinalIgnoreCase);
-        foreach (var rom in ordered)
+        // The whole catalog shows: owned games first (with their ROM), the rest after,
+        // each with a colored owned/missing label.
+        var byName = roms.GroupBy(r => r.GameName, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+        var ordered = TrophyCatalog.Games
+            .Select(game => (Game: game, Rom: byName.GetValueOrDefault(Normalise(game.Label))))
+            .OrderByDescending(e => e.Rom is not null)
+            .ThenBy(e => e.Game.Generation)
+            .ToList();
+        foreach (var (game, rom) in ordered)
         {
-            _roms.Add(rom);
-            _rows.Children.Add(BuildRomCard(rom));
+            if (rom is not null) _roms.Add(rom);
+            _rows.Children.Add(rom is not null ? BuildRomCard(rom) : BuildMissingCard(game.Label, game.Generation));
         }
         _countLabel.Text = AppStrings.RomCount(roms.Count);
         _readout.Text = roms.Count > 0
@@ -133,6 +141,58 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
             : _scanner.RomRoot is null ? AppStrings.NoRomRoot : AppStrings.Fr
                 ? "Appuyez sur Scanner pour chercher vos ROMs dans /storage/emulated/0/ROMs."
                 : "Tap Scan to look for your ROMs in /storage/emulated/0/ROMs.";
+    }
+
+    private static string Normalise(string label) =>
+        label.Replace("Pokémon ", "", StringComparison.OrdinalIgnoreCase)
+             .Replace("Pokemon ", "", StringComparison.OrdinalIgnoreCase)
+             .Replace(" Version", "", StringComparison.OrdinalIgnoreCase).Trim();
+
+    /// <summary>A catalog game the player has no ROM of: muted card, missing label.</summary>
+    private View BuildMissingCard(string label, int generation)
+    {
+        var mark = new GameCartridgeMark { WidthRequest = 40, HeightRequest = 40, Generation = generation };
+        var title = new Label
+        {
+            Text = Normalise(label),
+            FontFamily = DsChrome.PixelFont,
+            FontSize = 16,
+            TextColor = UiTokens.Ink1,
+            VerticalTextAlignment = TextAlignment.Center,
+        };
+        var subtitle = new Label
+        {
+            Text = $"Gen {generation}",
+            FontFamily = DsChrome.PixelFont,
+            FontSize = UiTokens.TextLabel,
+            TextColor = UiTokens.InkSoft,
+            VerticalTextAlignment = TextAlignment.Center,
+        };
+        var missing = new Label
+        {
+            Text = AppStrings.Fr ? "Pas de ROM" : "No ROM",
+            FontFamily = DsChrome.PixelFont,
+            FontSize = UiTokens.TextLabel,
+            TextColor = UiTokens.Ink1,
+            VerticalTextAlignment = TextAlignment.Center,
+            HorizontalOptions = LayoutOptions.End,
+        };
+        var text = new VerticalStackLayout { Spacing = 2, VerticalOptions = LayoutOptions.Center, Children = { title, subtitle } };
+        return new Border
+        {
+            BackgroundColor = UiTokens.Housing,
+            Stroke = UiTokens.ShellEdge,
+            StrokeThickness = 1,
+            Opacity = 0.6,
+            StrokeShape = new RoundRectangle { CornerRadius = UiTokens.ControlRadius },
+            Padding = new Thickness(10, 8),
+            Content = new Grid
+            {
+                ColumnDefinitions = [new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto)],
+                ColumnSpacing = 12,
+                Children = { mark, text, missing },
+            },
+        };
     }
 
     /// <summary>One game card: artwork (cartridge mark as fallback), title, generation·
@@ -214,6 +274,8 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
         Grid.SetColumn(text, 1);
         Grid.SetColumn(status, 2);
 
+        // Every binding in the card reads from the row's own context.
+        row.BindingContext = rom;
         var tap = new TapGestureRecognizer();
         tap.Tapped += (_, _) => _ = LaunchAsync(rom);
         row.GestureRecognizers.Add(tap);
