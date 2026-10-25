@@ -1573,7 +1573,7 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
             "IV total (best first)" => Domain.SortCriteria.IvTotalDesc,
             "Type" => Domain.SortCriteria.Type,
             "Age (oldest first)" => Domain.SortCriteria.AgeOldest,
-            AppStrings.Fr ? "Chromatiques d'abord" : "Shiny first" => Domain.SortCriteria.ShinyFirst,
+            var shinyFirst when shinyFirst == (AppStrings.Fr ? "Chromatiques d'abord" : "Shiny first") => Domain.SortCriteria.ShinyFirst,
             _ => Domain.SortCriteria.DexNumber,
         };
         IReadOnlyList<int>? boxes = scope == "This box" ? [_viewModel.BoxIndex] : null;
@@ -4914,7 +4914,13 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
             new PadOption("Male", IconPath: "male"),
             new PadOption(AppStrings.Fr ? "Femelle" : "Female", IconPath: "female"),
             new PadOption(AppStrings.Fr ? "Asexué" : "Genderless", IconPath: "genderless"));
-        var gender = choice switch { "Male" => 0, AppStrings.Fr ? "Femelle" : "Female" => 1, AppStrings.Fr ? "Asexué" : "Genderless" => 2, _ => (int?)null };
+        var gender = choice switch
+        {
+            var male when male == "Male" => 0,
+            var female when female == (AppStrings.Fr ? "Femelle" : "Female") => 1,
+            var genderless when genderless == (AppStrings.Fr ? "Asexué" : "Genderless") => 2,
+            _ => (int?)null,
+        };
         if (gender is { } value)
         {
             SetVmString(nameof(BoxBrowserViewModel.EditGender), value.ToString());
