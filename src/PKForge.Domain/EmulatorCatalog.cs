@@ -54,7 +54,7 @@ public static class EmulatorCatalog
             [RetroArchCore.Gambatte, RetroArchCore.MGba, RetroArchCore.MelonDs, RetroArchCore.DesMuMe]),
         new(EmulatorKind.MelonDS,
             ["io.github.melonds", "me.magnum.melonds"],
-            RomLaunchStyle.PathExtra),
+            RomLaunchStyle.UriData),
         new(EmulatorKind.Azahar,
             ["io.github.lime3ds.android", "org.azahar.azahar", "org.citra.emu", "io.github.azahar"],
             RomLaunchStyle.UriData),

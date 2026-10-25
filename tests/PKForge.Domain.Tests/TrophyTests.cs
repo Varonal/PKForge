@@ -245,9 +245,9 @@ public sealed class RomNameRulesTests
     [Theory]
     [InlineData("Pokemon - Emerald Version (France).gba", "Emerald")]
     [InlineData("Pokemon - Emerald Version.gba", "Emerald")]
-    [InlineData("Pokémon - Rouge Feu (France).gba", "Rouge Feu")]
+    [InlineData("Pokémon - Rouge Feu (France).gba", "FireRed")]
     [InlineData("Pokemon - HeartGold Version [b1].nds", "HeartGold")]
-    [InlineData("Pokemon - Or.gbc", "Or")]
+    [InlineData("Pokemon - Or.gbc", "Gold")]
     public void ParsesTheEditionOutOfTheFileName(string fileName, string expected) =>
         Assert.Equal(expected, RomNameRules.GameName(fileName));
 

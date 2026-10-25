@@ -124,15 +124,20 @@ public sealed record LibraryRom(
 public static class RomNameRules
 {
     /// <summary>
-    /// "Pokemon - Emerald Version (France).gba" → "Emerald". The franchise prefix, the
-    /// "Version" suffix, revision/region tags and disc numbers are all stripped; what
-    /// remains is the edition name the trophy and RA lookups expect.
+    /// "Pokemon - Emerald Version (France).gba" → "Emerald". The release number
+    /// ("1636 - "), the franchise prefix, the "Version"/"Version" suffix (French or
+    /// English), revision/region tags and disc numbers are all stripped; what remains
+    /// is the edition name, normalised to the English edition the catalog expects.
     /// </summary>
     public static string GameName(string fileName)
     {
         var name = fileName;
         var dot = name.LastIndexOf('.');
         if (dot > 0) name = name[..dot];
+        // No-Intro release numbers: "1636 - Pokemon Emerald (Independent)".
+        var dash = name.IndexOf(" - ", StringComparison.Ordinal);
+        if (dash is > 0 and < 8 && int.TryParse(name[..dash].Trim(), out _))
+            name = name[(dash + 3)..];
         foreach (var prefix in new[] { "Pokemon - ", "Pokémon - ", "Pokemon ", "Pokémon " })
             if (name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) { name = name[prefix.Length..]; break; }
         var cut = name.IndexOf(" (", StringComparison.Ordinal);
@@ -140,15 +145,32 @@ public static class RomNameRules
         cut = name.IndexOf(" [", StringComparison.Ordinal);
         if (cut > 0) name = name[..cut];
         name = name.Replace(" Version", "", StringComparison.OrdinalIgnoreCase).Trim();
-        return name;
+        // French dumps lead with the word: "Version Émeraude" → "Émeraude".
+        if (name.StartsWith("Version ", StringComparison.OrdinalIgnoreCase))
+            name = name["Version ".Length..].Trim();
+        // A French dump ("Émeraude") becomes the English edition the catalog,
+        // the art and the trophies expect; an English name passes through unchanged.
+        return FrenchEditionName.ToEnglish(name) ?? name;
     }
 
-    /// <summary>True when a file name looks like a Pokémon ROM at all.</summary>
-    public static bool LooksLikePokemon(string fileName) =>
-        fileName.StartsWith("Pokemon - ", StringComparison.OrdinalIgnoreCase)
-        || fileName.StartsWith("Pokémon - ", StringComparison.OrdinalIgnoreCase)
-        || fileName.StartsWith("Pokemon ", StringComparison.OrdinalIgnoreCase)
-        || fileName.StartsWith("Pokémon ", StringComparison.OrdinalIgnoreCase);
+    /// <summary>True when a file name looks like a Pokémon ROM at all — including
+    /// No-Intro release numbers and bare edition names with a Pokémon console extension.</summary>
+    public static bool LooksLikePokemon(string fileName)
+    {
+        if (fileName.StartsWith("Pokemon - ", StringComparison.OrdinalIgnoreCase)
+            || fileName.StartsWith("Pokémon - ", StringComparison.OrdinalIgnoreCase)
+            || fileName.StartsWith("Pokemon ", StringComparison.OrdinalIgnoreCase)
+            || fileName.StartsWith("Pokémon ", StringComparison.OrdinalIgnoreCase))
+            return true;
+        // "1636 - Pokemon Emerald (Independent).gba": the release-number prefix.
+        var dash = fileName.IndexOf(" - ", StringComparison.Ordinal);
+        if (dash is > 0 and < 8 && int.TryParse(fileName[..dash].Trim(), out _)
+            && fileName[(dash + 3)..].StartsWith("Pokemon", StringComparison.OrdinalIgnoreCase))
+            return true;
+        // A bare edition name the catalog knows ("emerald.gba", "rouge feu.gba").
+        var parsed = GameName(fileName);
+        return FrenchEditionName.ToEnglish(parsed) is not null;
+    }
 
     /// <summary>The Pokémon generation a game name belongs to (0 when unknown).</summary>
     public static int GenerationOf(string gameName) => gameName switch

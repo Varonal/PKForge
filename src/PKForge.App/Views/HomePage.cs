@@ -297,13 +297,13 @@ public sealed class HomePage : ContentPage, IPadHandler
             {
                 // First run plays like a Pokémon intro: a professor-style dialogue, then the choices.
                 await DialogueBox.ShowSequenceAsync(_hostGrid,
-                    "Hello! Welcome to PKForge!",
+                    AppStrings.Welcome,
                     "This is a place where your Pokémon from every game can live together, safely.",
                     "I can edit them, keep them in the Bank, and make sure each one is legal.",
                     "And every change is backed up before it is written, so nothing is ever lost.",
-                    "Now then... let's find your games!");
+                    AppStrings.FindYourGames);
 
-                var choice = await PadMenu.ShowAsync(_hostGrid, "Get started", null,
+                var choice = await PadMenu.ShowAsync(_hostGrid, AppStrings.GetStarted, null,
                     new PadOption(AppStrings.LinkEmulator, IconPath: "link", Detail: AppStrings.Fr ? "Choisissez le dossier où vos jeux gardent leurs sauvegardes." : "Pick the emulator folder where your games keep their saves."),
                     new PadOption(AppStrings.OpenSingleSave, IconPath: "file", Detail: AppStrings.Fr ? "Choisissez un seul fichier de sauvegarde plutôt qu'un dossier entier." : "Pick one save file instead of a whole emulator folder."),
                     new PadOption($"Download the sprite pack ({SpritePackDownloader.SizeHint})", IconPath: "download", Detail: "Animated sprites, HOME pictures and item icons, to use offline."),
@@ -530,7 +530,7 @@ public sealed class HomePage : ContentPage, IPadHandler
         var editions = SaveIdentityRules.ChoicesFor(guess.Family, guess.Label).Where(c => !c.IsHack).ToArray();
         var options = editions.Select(c => new PadOption(c.Label, IconPath: "game"))
             .Append(new PadOption(later, IconPath: "close")).ToArray();
-        var choice = await PadMenu.ShowAsync(_hostGrid, "Which version is this?",
+        var choice = await PadMenu.ShowAsync(_hostGrid, AppStrings.Fr ? "Quelle version est-ce ?" : "Which version is this?",
             "Both versions write the same save file, so PKForge cannot tell them apart. " +
             "Pick yours once; you can change it later from the save's menu (long-press).", options);
         if (choice is null) return false;
