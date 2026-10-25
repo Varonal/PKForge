@@ -143,6 +143,42 @@ public static class AppStrings
     public static string DecideLater => Fr ? "Décider plus tard" : "Decide later";
     public static string DownloadSpritePack => Fr ? "Télécharger le pack de sprites" : "Download the sprite pack";
 
+    // ---- Shelf status (SavePickerViewModel) ----
+    public static string LinkStorageToBegin => Fr ? "Liez le stockage d'un émulateur pour commencer." : "Link an emulator's storage to begin.";
+    public static string NoStorageLinkedYet => Fr ? "Aucun stockage lié. Ouvrez Lier et choisissez votre plateforme et émulateur." : "No storage units linked yet. Open Link and choose your platform and emulator.";
+    public static string LinkCancelled => Fr ? "Liaison annulée." : "Link cancelled.";
+    public static string StorageLinked => Fr ? "Stockage lié." : "Storage linked.";
+    public static string Connected => Fr ? "Connecté." : "Connected.";
+    public static string SelectSaveFile => Fr ? "Sélectionnez le fichier de sauvegarde à lier…" : "Select the save file to link…";
+    public static string LinkingFile(string name) => Fr ? $"Liaison de {name}…" : $"Linking {name}…";
+    public static string ConnectingTo(string game) => Fr ? $"Connexion à {game}…" : $"Connecting to {game}…";
+    public static string CouldNotConnect(string error) => Fr ? $"Connexion impossible : {error}" : $"Could not connect: {error}";
+    public static string CouldNotLinkSave(string error) => Fr ? $"Liaison impossible : {error}" : $"Could not link save: {error}";
+    public static string EmulatorLinked(string emulator) => Fr ? $"{emulator} lié" : $"{emulator} linked";
+    public static string NoSavesFoundIn(string folder, int rejected) => Fr
+        ? $"Aucune sauvegarde trouvée dans {folder}" + (rejected > 0 ? $"{rejected} fichier(s) ressemblaient à des sauvegardes mais illisibles. " : "")
+        : $"No saves found in {folder}";
+    public static string FoundSaves(int found, string folder) => Fr
+        ? $"{found} sauvegarde(s) Pokémon trouvée(s) dans {folder}."
+        : $"Found {found} Pokémon save{(found == 1 ? "" : "s")} in {folder}.";
+    public static string ScanningUnit(string emulator, string folder) => Fr ? $"Scan de l'unité {emulator} · {folder}…" : $"Scanning {emulator} unit · {folder}…";
+    public static string ScanFailed(string emulator, string error) => Fr ? $"Le scan de {emulator} a échoué : {error}" : $"Scan of {emulator} failed: {error}";
+    public static string SavesOnShelf(int saves, int files) => Fr
+        ? $"{saves} sauvegarde(s) sur l'étagère. {files} fichier(s) scanné(s)."
+        : $"{saves} save(s) on the shelf. Scanned {files} file(s).";
+    public static string NoGamesFound(int files, int rejected) => Fr
+        ? $"Aucun jeu trouvé. {files} fichier(s) scanné(s), {rejected} ressemblaient à des sauvegardes sans se laisser lire."
+        : $"No games found. Scanned {files} file(s), {rejected} looked like saves but did not parse.";
+    public static string ScanReportEmpty => Fr ? "Aucun scan diagnostique n'a encore tourné. Utilisez Rescanner les jeux, puis rouvrez le Rapport de scan." : "No diagnostic scan has run yet. Use Rescan games, then open Scan report again.";
+    public static string FolderStaysLinked => Fr ? " Le dossier reste lié ; déliez-le depuis Gérer les stockages liés." : " The folder stays linked; unlink it from Manage linked storage.";
+
+    // ---- Per-emulator folder guidance (the "nothing found" hints) ----
+    public static string GuidanceDefault => Fr ? "Choisissez le dossier qui contient vos fichiers de sauvegarde." : "Pick the folder that holds your save files.";
+    public static string GuidanceAzahar => Fr ? "Choisissez le dossier utilisateur de l'émulateur, celui qui contient sdmc (sdmc ou Nintendo 3DS fonctionnent aussi). Les sauvegardes vivent dans sdmc/Nintendo 3DS/…/title/00040000/<jeu>/data/00000001/main." : "Pick the emulator's user folder, the one that contains sdmc (sdmc or Nintendo 3DS work too). Saves live in sdmc/Nintendo 3DS/…/title/00040000/<game>/data/00000001/main.";
+    public static string GuidanceMelonDs => Fr ? "Choisissez le dossier de vos fichiers .sav : à côté de vos ROMs par défaut, ou le dossier de sauvegardes réglé dans melonDS." : "Pick the folder that holds your .sav files: next to your ROMs by default, or the save folder set in melonDS's settings.";
+    public static string GuidanceDrastic => Fr ? "Choisissez le dossier de sauvegardes de DraStic (ses .dsv) ou son dossier de données." : "Pick DraStic's backup folder (its .dsv battery saves) or the DraStic data folder.";
+    public static string GuidanceEden => Fr ? "Choisissez la racine de fichiers d'Eden, le dossier qui contient son stockage émulé." : "Pick Eden's files root, the folder that contains its emulated storage.";
+
     // ---- Platform names (menu Link) ----
     public static string PlatformGbGbc => Fr ? "Game Boy / Game Boy Color" : "Game Boy / Game Boy Color";
     public static string PlatformGba => "Game Boy Advance";

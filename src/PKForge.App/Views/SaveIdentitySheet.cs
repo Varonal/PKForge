@@ -12,16 +12,16 @@ namespace PKForge.App.Views;
 /// </summary>
 public static class SaveIdentitySheet
 {
-    public const string OpenOption = "Open save";
-    public const string PlayOption = "Play";
-    public const string LinkRomOption = "Link ROM…";
-    public const string UnlinkRomOption = "Unlink ROM";
-    private const string RenameOption = "Rename";
-    private const string ColorOption = "Cartridge color";
-    private const string GameOption = "Set game…";
-    private const string HideOption = "Hide save";
-    private const string ResetOption = "Reset to detected";
-    private const string ReadOnlyOption = "Make read-only";
+    public static string OpenOption => AppStrings.OpenSave;
+    public static string PlayOption => AppStrings.Play;
+    public static string LinkRomOption => AppStrings.LinkRom;
+    public static string UnlinkRomOption => AppStrings.UnlinkRom;
+    private static string RenameOption => AppStrings.Fr ? "Renommer" : "Rename";
+    private static string ColorOption => AppStrings.Fr ? "Couleur de la cartouche" : "Cartridge color";
+    private static string GameOption => AppStrings.Fr ? "Définir le jeu…" : "Set game…";
+    private static string HideOption => AppStrings.Fr ? "Masquer la sauvegarde" : "Hide save";
+    private static string ResetOption => AppStrings.Fr ? "Rétablir la détection" : "Reset to detected";
+    private static string ReadOnlyOption => AppStrings.Fr ? "Rendre en lecture seule" : "Make read-only";
 
     /// <summary>
     /// Shows the save menu. Returns true when the player picked "Open save" (the caller
@@ -39,17 +39,17 @@ public static class SaveIdentitySheet
         if (romLink is { } link)
         {
             options.Add(new PadOption(PlayOption, IconPath: "play",
-                Detail: $"Launch {link.RomFileName} in {SaveDescriptions.EmulatorName(link.Emulator)}"));
-            options.Add(new PadOption(UnlinkRomOption, IconPath: "unlink", Detail: "Forget this save's ROM. The save file stays."));
+                Detail: AppStrings.Fr ? $"Lancer {link.RomFileName} dans {SaveDescriptions.EmulatorName(link.Emulator)}" : $"Launch {link.RomFileName} in {SaveDescriptions.EmulatorName(link.Emulator)}"));
+            options.Add(new PadOption(UnlinkRomOption, IconPath: "unlink", Detail: AppStrings.Fr ? "Oublie la ROM de cette sauvegarde. Le fichier de sauvegarde reste." : "Forget this save's ROM. The save file stays."));
         }
         options.Add(new PadOption(LinkRomOption, IconPath: "file",
             Detail: romLink is null
-                ? "Pick this game's ROM once; Play then launches it in its emulator."
-                : $"Replace {romLink.RomFileName}."));
+                ? (AppStrings.Fr ? "Choisissez la ROM de ce jeu une fois ; Jouer la lancera dans son émulateur." : "Pick this game's ROM once; Play then launches it in its emulator.")
+                : (AppStrings.Fr ? $"Remplacer {romLink.RomFileName}." : $"Replace {romLink.RomFileName}.")));
         options.Add(new PadOption(RenameOption, IconPath: "rename"));
         options.Add(new PadOption(ColorOption, Glyph: "●", Accent: SaveColors.For(resolved?.ColorKey, save.Generation),
-            Detail: "The colour of this save's cartridge on the Home shelf."));
-        if (guess is not null) options.Add(new PadOption(GameOption, IconPath: "game", Detail: "Say which game this is, from those that share its save format."));
+            Detail: AppStrings.Fr ? "La couleur de la cartouche sur l'étagère d'accueil." : "The colour of this save's cartridge on the Home shelf."));
+        if (guess is not null) options.Add(new PadOption(GameOption, IconPath: "game", Detail: AppStrings.Fr ? "Dites quel jeu c'est, parmi ceux qui partagent son format de sauvegarde." : "Say which game this is, from those that share its save format."));
         // Only saves the box already warned about as a suspected ROM hack carry the choice.
         var flaggedHack = RomHackNotice.IsFlagged(save.DocumentId);
         var acceptedHack = store.Get(save.DocumentId)?.AcceptedHackRisk == true;
@@ -57,46 +57,46 @@ public static class SaveIdentitySheet
             options.Add(new PadOption(ReadOnlyOption, IconPath: "box", Detail: $"{RomHackNotice.Marker} · editing allowed at your own risk"));
         else if (flaggedHack)
             options.Add(new PadOption(RomHackNotice.EditOption, Glyph: "!", Accent: UiTokens.Bad, Detail: $"{RomHackNotice.Marker} · read-only now"));
-        options.Add(new PadOption(HideOption, IconPath: "hide", Detail: "Remove from Home and pickers. Settings can show it again."));
-        if (resolved is { IsCustomized: true }) options.Add(new PadOption(ResetOption, IconPath: "restore", Detail: "Forget your name, colour and game choices. The file is not touched."));
+        options.Add(new PadOption(HideOption, IconPath: "hide", Detail: AppStrings.Fr ? "Retire de l'accueil et des sélecteurs. Les réglages peuvent l'afficher à nouveau." : "Remove from Home and pickers. Settings can show it again."));
+        if (resolved is { IsCustomized: true }) options.Add(new PadOption(ResetOption, IconPath: "restore", Detail: AppStrings.Fr ? "Oublie vos choix de nom, couleur et jeu. Le fichier n'est pas touché." : "Forget your name, colour and game choices. The file is not touched."));
 
         var choice = await PadMenu.ShowAsync(host, save.GameLabel, Describe(save), [.. options]);
         var current = store.Get(save.DocumentId) ?? new SaveIdentity(save.DocumentId);
         switch (choice)
         {
-            case OpenOption:
+            case var open when open == OpenOption:
                 return true;
-            case PlayOption when romLink is not null:
+            case var play when play == PlayOption && romLink is not null:
                 await LaunchAsync(host, romLink);
                 return false;
-            case LinkRomOption:
+            case var linkRom when linkRom == LinkRomOption:
                 await LinkRomAsync(host, save);
                 return false;
-            case UnlinkRomOption when romLink is not null:
+            case var unlinkRom when unlinkRom == UnlinkRomOption && romLink is not null:
                 RomLinks?.Remove(save.DocumentId);
                 return false;
-            case RenameOption:
+            case var rename when rename == RenameOption:
                 await RenameAsync(host, store, current, current.DisplayName ?? guess?.SuggestedName ?? save.GameLabel);
                 return false;
-            case ColorOption:
+            case var color when color == ColorOption:
                 await PickColorAsync(host, store, current, save.Generation);
                 return false;
-            case GameOption when guess is not null:
+            case var game when game == GameOption && guess is not null:
                 await PickGameAsync(host, store, current, guess);
                 return false;
-            case RomHackNotice.EditOption when flaggedHack:
+            case var hackEdit when hackEdit == RomHackNotice.EditOption && flaggedHack:
                 if (await PadMenu.ConfirmAsync(host, RomHackNotice.Title, RomHackNotice.Warning, RomHackNotice.EditOption))
                     Writer?.ConfirmLayoutRisk(save.DocumentId);
                 return false;
-            case ReadOnlyOption:
+            case var readOnly when readOnly == ReadOnlyOption:
                 Writer?.RevokeLayoutRisk(save.DocumentId);
                 return false;
-            case HideOption:
+            case var hide when hide == HideOption:
                 store.Set(current with { Hidden = true });
                 return false;
-            case ResetOption:
-                if (await PadMenu.ConfirmAsync(host, "Reset to detected",
-                        "Forget this save's name, color, game choice and ROM-hack editing choice, and show it again if hidden? The save file itself is not touched.", "Reset"))
+            case var reset when reset == ResetOption:
+                if (await PadMenu.ConfirmAsync(host, ResetOption,
+                        AppStrings.Fr ? "Oublier le nom, la couleur, le choix de jeu et le choix d'édition ROM-hack de cette sauvegarde, et l'afficher à nouveau si masquée ? Le fichier de sauvegarde n'est pas touché." : "Forget this save's name, color, game choice and ROM-hack editing choice, and show it again if hidden? The save file itself is not touched.", AppStrings.Fr ? "Rétablir" : "Reset"))
                     store.Reset(save.DocumentId);
                 return false;
             default:
@@ -197,7 +197,7 @@ public static class SaveIdentitySheet
 
     private static async Task RenameAsync(Grid host, ISaveIdentityStore store, SaveIdentity current, string shown)
     {
-        var text = await TextPopup.ShowLineAsync(host, "Name this save", "Leave empty to use the game's name", shown);
+        var text = await TextPopup.ShowLineAsync(host, AppStrings.Fr ? "Nommer cette sauvegarde" : "Name this save", AppStrings.Fr ? "Laissez vide pour le nom du jeu" : "Leave empty to use the game's name", shown);
         if (text is null) return;
         store.Set(current with { DisplayName = text.Length == 0 ? null : text[..Math.Min(text.Length, 32)] });
     }
