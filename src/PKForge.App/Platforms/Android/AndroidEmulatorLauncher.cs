@@ -8,13 +8,13 @@ using PKForge.Domain;
 namespace PKForge.App;
 
 /// <summary>
-/// Hands a linked ROM to its emulator, using each family's documented launch contract:
-/// RetroArch takes an explicit RetroActivityFuture component with ROM + LIBRETRO extras
-/// (the libretro CLI contract: "Only ROM and LIBRETRO are needed"); melonDS takes its
-/// EmulatorActivity with a PATH extra (its frontend contract, from melonDS-android's own
-/// README); every other emulator gets an ACTION_VIEW with the ROM's URI and MIME, left
-/// to Android's resolver — and when nothing resolves, the emulator's own library opens
-/// with a clear status message instead of a silent black screen.
+/// Hands a linked ROM to its emulator, PlayHub-style: package-scoped intents, never
+/// explicit components (an explicit component that does not match the installed build
+/// throws SecurityException and the launch dies silently). RetroArch gets a MAIN intent
+/// scoped to its package with the ROM as data plus its content-loading extras; every
+/// standalone emulator gets an ACTION_VIEW scoped to its package with the ROM URI and
+/// a MIME type, resolved first — when nothing resolves, the emulator's own library
+/// opens with a clear message instead of a black screen.
 /// </summary>
 public sealed class AndroidEmulatorLauncher : IEmulatorLauncher
 {
@@ -44,11 +44,6 @@ public sealed class AndroidEmulatorLauncher : IEmulatorLauncher
             Services.AppLog.Info("launch", $"{SaveDescriptions.EmulatorName(link.Emulator)} is not installed ({package}).");
             return false;
         }
-        if (app.LaunchStyle == RomLaunchStyle.OpenAppOnly)
-        {
-            // No documented handoff: the emulator's own library is the launch surface.
-            return await OpenAppAsync(link.Emulator, cancellationToken).ConfigureAwait(true);
-        }
 
         // One URI per launch: content ids pass through, plain paths become file://.
         var rom = ResolveUri(link.RomUri);
@@ -59,8 +54,17 @@ public sealed class AndroidEmulatorLauncher : IEmulatorLauncher
         }
 
         var activity = Platform.CurrentActivity ?? throw new InvalidOperationException("No foreground Android activity is available.");
+        var context = activity.ApplicationContext ?? (Android.Content.Context)activity;
         var intent = BuildIntent(app.LaunchStyle, package, rom, link);
         if (intent is null) return await OpenAppAsync(link.Emulator, cancellationToken).ConfigureAwait(true);
+
+        // Nothing in the target package answers this intent: open its library instead
+        // of a dead screen, and say so.
+        if (intent.ResolveActivity(context.PackageManager!) is null)
+        {
+            Services.AppLog.Info("launch", $"{package} has no activity for the ROM handoff; opening its library.");
+            return await OpenAppAsync(link.Emulator, cancellationToken).ConfigureAwait(true);
+        }
         return StartActivity(activity, intent, link);
     }
 
@@ -106,65 +110,57 @@ public sealed class AndroidEmulatorLauncher : IEmulatorLauncher
         }
     }
 
-    /// <summary>The intent family per launch style; each names its own contract.</summary>
+    /// <summary>The package-scoped intent per launch style. No explicit components:
+    /// the emulator's own manifest decides which activity answers.</summary>
     private static Intent? BuildIntent(RomLaunchStyle style, string package, AndroidUri rom, RomLink link) => style switch
     {
         RomLaunchStyle.RetroArch => RetroArchIntent(package, rom, link),
         RomLaunchStyle.PathExtra => PathExtraIntent(package, rom, link),
-        RomLaunchStyle.UriData => ViewIntent(rom),
+        RomLaunchStyle.UriData => ViewIntent(package, rom),
         _ => null,
     };
 
     /// <summary>
-    /// RetroArch's documented CLI contract, verbatim: an explicit component on
-    /// RetroActivityFuture (the activity name is com.retroarch.browser.retroactivity.
-    /// RetroActivityFuture in every build; only the package differs) with the ROM path
-    /// and the core path as string extras. "Only ROM and LIBRETRO are needed" per the
-    /// libretro CLI guide; CONFIGFILE points at the standard config so settings stick.
-    /// The core path names the installed package's own core directory — RetroArch reads
-    /// it itself (our app cannot), and pairs the ROM on its own when the core is absent.
+    /// RetroArch's content-loading contract: a MAIN intent scoped to its package with
+    /// the ROM as data and MIME, plus the EXTRA_CONTENT / RETROARCH_LOAD_CONTENT_PATH
+    /// pair and a core path hint. Package scoping (never a component) is what frontends
+    /// like Pegasus use; the extras make RetroArch load the game directly.
     /// </summary>
     private static Intent RetroArchIntent(string package, AndroidUri rom, RomLink link)
     {
-        var intent = new Intent();
-        intent.SetComponent(new ComponentName(package, "com.retroarch.browser.retroactivity.RetroActivityFuture"));
-        intent.SetAction(Intent.ActionMain);
+        var intent = new Intent(Intent.ActionMain, rom);
+        intent.SetPackage(package);
         intent.AddCategory(Intent.CategoryLauncher);
-        intent.AddFlags(ActivityFlags.NewTask);
-        intent.PutExtra("ROM", RomPathFor(link));
+        intent.SetDataAndType(rom, "application/octet-stream");
+        intent.PutExtra("RETROARCH_LOAD_CONTENT_PATH", rom.ToString());
+        intent.PutExtra("EXTRA_CONTENT", rom.ToString());
+        intent.PutExtra("EXTRA_GAME_LABEL", link.GameLabel);
         var core = CorePathHint(link.Generation, package);
-        if (core is not null) intent.PutExtra("LIBRETRO", core);
-        var config = ConfigFileFor(package);
-        if (config is not null) intent.PutExtra("CONFIGFILE", config);
+        if (core is not null) intent.PutExtra("EXTRA_CORE_PATH", core);
         return intent;
     }
 
     /// <summary>
-    /// melonDS-android's own frontend contract (its README): ACTION_VIEW on an explicit
-    /// EmulatorActivity component with the ROM's path in a PATH extra. ZIP and 7z are
-    /// supported; the ROM must already be in melonDS's library or beside it for saves.
+    /// melonDS-android's frontend contract (its README): ACTION_VIEW on the ROM with a
+    /// PATH extra, scoped to the package. The activity name differs between builds
+    /// (io.github.melonds vs me.magnum.melonds), so the package scope resolves it.
     /// </summary>
     private static Intent PathExtraIntent(string package, AndroidUri rom, RomLink link)
     {
         var intent = new Intent(Intent.ActionView);
-        var activity = $"{package}.ui.emulator.EmulatorActivity";
-        intent.SetComponent(new ComponentName(package, activity));
+        intent.SetPackage(package);
+        intent.SetDataAndType(rom, "application/octet-stream");
         intent.PutExtra("PATH", RomPathFor(link));
-        intent.AddFlags(ActivityFlags.NewTask);
         return intent;
     }
 
-    /// <summary>
-    /// The generic handoff for emulators without a component-level contract: ACTION_VIEW
-    /// with the ROM's URI and MIME, no package pin — Android's resolver picks the app
-    /// (the player may get a chooser). When nothing resolves, the launcher opens the
-    /// app's own library instead of failing silently.
-    /// </summary>
-    private static Intent ViewIntent(AndroidUri rom)
+    /// <summary>The generic handoff: ACTION_VIEW scoped to the package, ROM as data.
+    /// The emulator's own content screen loads the game (Eden, Azahar, Citra, ...).</summary>
+    private static Intent ViewIntent(string package, AndroidUri rom)
     {
         var intent = new Intent(Intent.ActionView);
+        intent.SetPackage(package);
         intent.SetDataAndType(rom, "application/octet-stream");
-        intent.AddFlags(ActivityFlags.GrantReadUriPermission);
         return intent;
     }
 
@@ -176,8 +172,7 @@ public sealed class AndroidEmulatorLauncher : IEmulatorLauncher
             : link.RomUri;
 
     /// <summary>The core RetroArch pairs with the ROM's generation, inside its own
-    /// package directory; null for DS (RetroArch's DS cores are opt-in) and unknowns,
-    /// where RetroArch pairs the ROM on its own.</summary>
+    /// package directory; null for DS and unknowns, where RetroArch pairs on its own.</summary>
     private static string? CorePathHint(int generation, string package)
     {
         var coreFile = generation switch
@@ -188,15 +183,6 @@ public sealed class AndroidEmulatorLauncher : IEmulatorLauncher
         };
         return coreFile is null ? null : $"/data/data/{package}/cores/{coreFile}";
     }
-
-    /// <summary>The standard config per RetroArch build; null for forks that moved it.</summary>
-    private static string? ConfigFileFor(string package) => package switch
-    {
-        "com.retroarch" => "/storage/emulated/0/Android/data/com.retroarch/files/retroarch.cfg",
-        "com.retroarch.aarch64" => "/storage/emulated/0/Android/data/com.retroarch.aarch64/files/retroarch.cfg",
-        "com.retroarch.ra32" => "/storage/emulated/0/Android/data/com.retroarch.ra32/files/retroarch.cfg",
-        _ => null,
-    };
 
     /// <summary>Starts the intent; false when no activity accepted it or the ROM grant failed.</summary>
     private static bool StartActivity(Activity activity, Intent intent, RomLink link)

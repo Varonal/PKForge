@@ -125,10 +125,10 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
         // each with a colored owned/missing label.
         var byName = roms.GroupBy(r => r.GameName, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+        // Catalog order (Gen 1 → 9, release order within a generation): owned games
+        // show their ROM, the rest show the colored missing label.
         var ordered = TrophyCatalog.Games
             .Select(game => (Game: game, Rom: byName.GetValueOrDefault(Normalise(game.Label))))
-            .OrderByDescending(e => e.Rom is not null)
-            .ThenBy(e => e.Game.Generation)
             .ToList();
         foreach (var (game, rom) in ordered)
         {
@@ -151,7 +151,16 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
     /// <summary>A catalog game the player has no ROM of: muted card, missing label.</summary>
     private View BuildMissingCard(string label, int generation)
     {
+        // The artwork loads for missing games too: the catalog always shows its face.
+        var art = new Image
+        {
+            Aspect = Aspect.AspectFit,
+            WidthRequest = 44,
+            HeightRequest = 44,
+            IsVisible = false,
+        };
         var mark = new GameCartridgeMark { WidthRequest = 40, HeightRequest = 40, Generation = generation };
+        _ = LoadArtAsync(art, mark, Normalise(label));
         var title = new Label
         {
             Text = Normalise(label),
@@ -190,7 +199,7 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
             {
                 ColumnDefinitions = [new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto)],
                 ColumnSpacing = 12,
-                Children = { mark, text, missing },
+                Children = { new Grid { Children = { mark, art } }, text, missing },
             },
         };
     }
@@ -199,6 +208,8 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
     /// emulator subtitle, and the colored status line.</summary>
     private View BuildRomCard(LibraryRom rom)
     {
+        // The artwork loads asynchronously at build time: the cartridge mark shows
+        // until the icon is ready, then takes its place (PlayHub's pattern).
         var art = new Image
         {
             Aspect = Aspect.AspectFit,
@@ -206,21 +217,8 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
             HeightRequest = 44,
             IsVisible = false,
         };
-        var mark = new GameCartridgeMark { WidthRequest = 40, HeightRequest = 40 };
-        art.BindingContextChanged += async (_, _) =>
-        {
-            if (art.BindingContext is not LibraryRom card) return;
-            art.IsVisible = false;
-            mark.IsVisible = true;
-            var path = await GameArt.GetIconAsync($"Pokémon {card.GameName}");
-            if (!ReferenceEquals(art.BindingContext, card)) return;
-            art.Source = path;
-            art.IsVisible = path is not null;
-            mark.IsVisible = path is null;
-        };
-        art.BindingContext = rom;
-        mark.BindingContext = rom;
-        mark.SetBinding(GameCartridgeMark.GenerationProperty, "Generation");
+        var mark = new GameCartridgeMark { WidthRequest = 40, HeightRequest = 40, Generation = rom.Generation };
+        _ = LoadArtAsync(art, mark, rom.GameName);
 
         var title = new Label
         {
@@ -280,6 +278,16 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
         tap.Tapped += (_, _) => _ = LaunchAsync(rom);
         row.GestureRecognizers.Add(tap);
         return row;
+    }
+
+    /// <summary>Loads the game's artwork; the cartridge mark stays until it lands.</summary>
+    private static async Task LoadArtAsync(Image art, GameCartridgeMark mark, string gameName)
+    {
+        var path = await GameArt.GetIconAsync($"Pokémon {gameName}");
+        if (path is null) return;
+        art.Source = path;
+        art.IsVisible = true;
+        mark.IsVisible = false;
     }
 
     /// <summary>A tap launches: the console's bound emulator, and the ROM's plain path.</summary>
