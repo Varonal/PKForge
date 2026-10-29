@@ -117,6 +117,16 @@ internal sealed class MgbaCore : Domain.IEmbeddedCore
         return BinaryPrimitives.ReadUInt32LittleEndian(four);
     }
 
+    /// <summary>
+    /// Drains the core's audio into the destination as interleaved stereo int16
+    /// (AudioTrack's PCM16 stereo layout). Returns the frames (sample pairs) read.
+    /// </summary>
+    public int ReadAudio(Span<short> destination, int samplesPerChannel)
+    {
+        if (!IsRunning || samplesPerChannel <= 0) return 0;
+        return MgbaNative.CoreReadAudio(_core, destination, samplesPerChannel);
+    }
+
     public bool SaveState(string path)
     {
         ThrowWhenNotRunning();

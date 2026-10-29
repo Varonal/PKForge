@@ -300,6 +300,19 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
             return;
         }
         var kind = bound ?? fallback;
+        // GB/GBC/GBA play embedded when the core is packed (option A): the game
+        // runs in-process, its memory readable live by the companion. Anything
+        // else (or no library) keeps the external emulator path.
+        if (rom.Console is GameConsole.GameBoy or GameConsole.GameBoyColor or GameConsole.GameBoyAdvance)
+        {
+            var save = FindSaveFor(rom.FilePath);
+            var session = await Task.Run(() => Platforms.Android.EmbeddedGameSession.TryStart(rom.FilePath, save));
+            if (session is not null)
+            {
+                await MainThread.InvokeOnMainThreadAsync(() => Navigation.PushAsync(new EmbeddedGamePage(session)));
+                return;
+            }
+        }
         var link = new RomLink("library", rom.FilePath, rom.FileName, kind,
             RomNameRules.GenerationOf(rom.GameName), $"Pokémon {rom.GameName}");
         if (await _launcher.LaunchAsync(link))
@@ -311,6 +324,20 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
         }
         await PadMenu.ShowAsync(_hostGrid, AppStrings.RomMissing,
             $"{SaveDescriptions.EmulatorName(kind)}: {rom.FileName}", AppStrings.Ok);
+    }
+
+    /// <summary>The save file mGBA's convention names for a ROM, when it exists.</summary>
+    private static string? FindSaveFor(string romPath)
+    {
+        try
+        {
+            var save = Path.ChangeExtension(romPath, ".sav");
+            return File.Exists(save) ? save : null;
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
     }
 
     /// <summary>One pass over every console's ES-DE folder; the library is replaced wholesale.</summary>

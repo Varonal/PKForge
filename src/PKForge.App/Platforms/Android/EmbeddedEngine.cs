@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Android.Media;
 using SkiaSharp;
 
 namespace PKForge.App.Platforms.Android;
@@ -22,7 +23,11 @@ internal sealed class EmbeddedEngine : IDisposable
     private readonly object _frameGate = new();
     private SKBitmap? _frame;
 
-    private uint _keys;
+    // The GBA's audio: 32768 Hz stereo, ~548 samples per frame.
+    private const int AudioFramesPerDrain = 1024;
+    private readonly short[] _audioScratch = new short[AudioFramesPerDrain * 2];
+    private readonly Java.Nio.ByteBuffer _audioBuffer;
+    private readonly AudioTrack? _track;
     private volatile uint _keysPending;
     private readonly object _keyGate = new();
 
@@ -36,6 +41,31 @@ internal sealed class EmbeddedEngine : IDisposable
         _core = core ?? throw new ArgumentNullException(nameof(core));
         if (!core.IsRunning) throw new ArgumentException("The core has no ROM loaded.", nameof(core));
         _thread = new Thread(RunLoop) { IsBackground = true, Name = "PKForge emu" };
+        _audioBuffer = Java.Nio.ByteBuffer.AllocateDirect(_audioScratch.Length * sizeof(short));
+        _audioBuffer.Order(Java.Nio.ByteOrder.LittleEndian);
+        try
+        {
+            // 32768 Hz is the GBA's own rate. The buffer holds ~116 ms of audio
+            // (3840 frames × 4 bytes): responsive, and one GC pause never starves.
+            _track = new AudioTrack.Builder()
+                .SetAudioAttributes(new AudioAttributes.Builder()
+                    .SetUsage(UsageKind.Game)
+                    .SetContentType(AudioContentType.Game)
+                    .Build())
+                .SetAudioFormat(new AudioFormat.Builder()
+                    .SetEncoding(Encoding.Pcm16bit)
+                    .SetSampleRate(32768)
+                    .SetChannelMask(ChannelOut.Stereo)
+                    .Build())
+                .SetBufferSizeInBytes(3840 * 4)
+                .SetTransferMode(AudioTrackMode.Stream)
+                .Build();
+            _track.Play();
+        }
+        catch (Exception)
+        {
+            _track = null; // no audio device: the game still plays, silently
+        }
     }
 
     public void Start() => _thread.Start();
@@ -88,6 +118,19 @@ internal sealed class EmbeddedEngine : IDisposable
             }
             FrameProduced?.Invoke();
 
+            // Drain this frame's audio into the track: the audio clock paces the
+            // loop when the track's buffer fills (writes block), which is the
+            // PokeDaisy-verified pattern — the game can never outrun its sound.
+            var frames = _core.ReadAudio(_audioScratch, AudioFramesPerDrain);
+            if (frames > 0 && _track is not null)
+            {
+                _audioBuffer.Rewind();
+                _audioBuffer.AsShortBuffer().Put(_audioScratch, 0, frames * 2);
+                _audioBuffer.Rewind();
+                // The track is in bytes: frames × 2 channels × 2 bytes.
+                _track.Write(_audioBuffer, frames * 4, WriteMode.Blocking);
+            }
+
             // Pace to the hardware rate. Sleep granularity (~15 ms on some
             // kernels) is corrected by measuring and carrying the error forward.
             deadline += (long)periodTicks;
@@ -113,6 +156,8 @@ internal sealed class EmbeddedEngine : IDisposable
             _frame?.Dispose();
             _frame = null;
         }
+        _track?.Stop();
+        _track?.Release();
         _cancel.Dispose();
     }
 }

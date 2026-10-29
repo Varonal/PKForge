@@ -10,6 +10,7 @@
  */
 
 #include <mgba/core/core.h>
+#include <mgba/core/blip_buf.h>
 #include <mgba-util/vfile.h>
 #include <string.h>
 #include <stdlib.h>
@@ -231,4 +232,31 @@ int pkforg_core_load_state(intptr_t coreHandle, const char* path) {
 	bool ok = mCoreLoadStateNamed(core, vf, PKFORGE_STATE_FLAGS);
 	vf->close(vf);
 	return ok ? 1 : 0;
+}
+
+int pkforg_core_read_audio(intptr_t coreHandle, int16_t* destination, int samplesPerChannel) {
+	struct mCore* core = asCore(coreHandle);
+	if (!core || !destination || samplesPerChannel <= 0) {
+		return 0;
+	}
+	struct blip_t* left = core->getAudioChannel(core, 0);
+	struct blip_t* right = core->getAudioChannel(core, 1);
+	if (!left || !right) {
+		return 0;
+	}
+	int avail = blip_samples_avail(left);
+	if (avail <= 0) {
+		return 0;
+	}
+	int count = avail < samplesPerChannel ? avail : samplesPerChannel;
+	/* Interleave L,R into the destination (AudioTrack's stereo frame layout). */
+	for (int i = 0; i < count; i++) {
+		int16_t l = 0;
+		int16_t r = 0;
+		blip_read_samples(left, &l, 1, false);
+		blip_read_samples(right, &r, 1, false);
+		destination[i * 2] = l;
+		destination[i * 2 + 1] = r;
+	}
+	return count;
 }

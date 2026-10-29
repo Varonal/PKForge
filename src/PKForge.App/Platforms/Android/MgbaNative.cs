@@ -64,6 +64,12 @@ internal static partial class MgbaNative
     [LibraryImport(Library, EntryPoint = "pkforg_core_game_code")]
     internal static partial void CoreGameCode(nint core, Span<byte> code);
 
+    // ---- Audio (the GBA's 32768 Hz stereo, interleaved by the shim) ----
+
+    /// <summary>Drains up to samplesPerChannel×2 int16s; returns the frames read, 0 when none.</summary>
+    [LibraryImport(Library, EntryPoint = "pkforg_core_read_audio")]
+    internal static partial int CoreReadAudio(nint core, Span<short> destination, int samplesPerChannel);
+
     // ---- Save states (mGBA's .ss format, desktop-compatible) ----
 
     [LibraryImport(Library, EntryPoint = "pkforg_core_save_state", StringMarshalling = StringMarshalling.Utf8)]
