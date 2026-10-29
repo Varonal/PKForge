@@ -38,8 +38,7 @@ public sealed class HttpRetroAchievementsClient(
         await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token).ConfigureAwait(false);
         using var document = await JsonDocument.ParseAsync(stream, cancellationToken: timeout.Token).ConfigureAwait(false);
         // An unknown user comes back as an error object, a valid one as a profile with an ID.
-        return document.RootElement.ValueKind == JsonValueKind.Object
-            && document.RootElement.TryGetProperty("ID", out _);
+        return RetroAchievementsJson.LooksLikeProfile(document.RootElement);
     }
 
     public async Task<RetroGameProgress> GetGameProgressAsync(int gameId, CancellationToken cancellationToken = default)
@@ -55,45 +54,12 @@ public sealed class HttpRetroAchievementsClient(
         await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token).ConfigureAwait(false);
         using var document = await JsonDocument.ParseAsync(stream, cancellationToken: timeout.Token).ConfigureAwait(false);
         var root = document.RootElement;
-        if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("ID", out _))
+        if (!RetroAchievementsJson.LooksLikeGame(root))
             throw new InvalidOperationException("RetroAchievements did not recognise that game.");
 
-        var title = root.TryGetProperty("Title", out var titleElement) ? titleElement.GetString() ?? string.Empty : string.Empty;
-        var achievements = new List<RetroAchievement>();
-        if (root.TryGetProperty("Achievements", out var set) && set.ValueKind == JsonValueKind.Object)
-        {
-            foreach (var entry in set.EnumerateObject())
-            {
-                var a = entry.Value;
-                var id = a.TryGetProperty("ID", out var idElement) && idElement.TryGetInt32(out var parsedId) ? parsedId : 0;
-                var earned = a.TryGetProperty("DateEarned", out var dateEarned) && dateEarned.ValueKind == JsonValueKind.String;
-                var earnedHardcore = a.TryGetProperty("DateEarnedHardcore", out var dateHardcore) && dateHardcore.ValueKind == JsonValueKind.String;
-                achievements.Add(new RetroAchievement(
-                    id,
-                    a.TryGetProperty("Title", out var name) ? name.GetString() ?? string.Empty : string.Empty,
-                    a.TryGetProperty("Description", out var description) ? description.GetString() ?? string.Empty : string.Empty,
-                    a.TryGetProperty("Points", out var points) && points.TryGetInt32(out var pointValue) ? pointValue : 0,
-                    a.TryGetProperty("BadgeName", out var badge) ? badge.GetString() ?? string.Empty : string.Empty,
-                    earned,
-                    earned && ParseTimestamp(a, "DateEarned"),
-                    earnedHardcore));
-            }
-        }
-
-        var progress = new RetroGameProgress(gameId, title, [.. achievements.OrderBy(a => a.Id)]);
+        var progress = RetroAchievementsJson.ParseGameProgress(root, gameId);
         cache.Store(progress);
         return progress;
-    }
-
-    /// <summary>RA's "YYYY-MM-DD HH:mm:ss" timestamps, treated as UTC (the site's own clock).</summary>
-    private static DateTimeOffset? ParseTimestamp(JsonElement achievement, string property)
-    {
-        if (!achievement.TryGetProperty(property, out var value) || value.ValueKind != JsonValueKind.String) return null;
-        return DateTimeOffset.TryParse(
-            value.GetString(),
-            System.Globalization.CultureInfo.InvariantCulture,
-            System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal,
-            out var parsed) ? parsed : null;
     }
 }
 

@@ -64,7 +64,7 @@ public static class RomLinkRules
 
     /// <summary>The subtitle the Emulators tab and the identity menu show for a link.</summary>
     public static string Describe(RomLink link) =>
-        $"{link.RomFileName} · {SaveDescriptions.EmulatorName(link.Emulator)}";
+        $"{link.RomFileName} · {EmulatorCatalog.Name(link.Emulator)}";
 
     private static string ExtensionOf(string fileName)
     {

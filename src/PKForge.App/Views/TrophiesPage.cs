@@ -21,7 +21,6 @@ public sealed class TrophiesPage : ContentPage, IPadHandler
     private VerticalStackLayout _rows = null!;
     private Grid _hostGrid = null!;
     private Label _readout = null!;
-    private GameTrophyCard? _open;
 
     public TrophiesPage(SavePickerViewModel saves, TrophyScanService scanner, ITrophyStore trophies)
     {

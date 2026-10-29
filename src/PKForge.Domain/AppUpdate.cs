@@ -31,9 +31,12 @@ public static class AppUpdateRules
         var core = next.Core.CompareTo(current.Core);
         if (core != 0)
             return core > 0;
+        // SemVer: a release outranks any prerelease of the same version; among two
+        // prereleases, the one with the more dot-separated identifiers wins when all
+        // shared identifiers tie (1.4.0-beta.2 > 1.4.0-beta.1 > 1.4.0-beta).
         if (next.Prerelease.Length == 0 || current.Prerelease.Length == 0)
             return next.Prerelease.Length == 0 && current.Prerelease.Length != 0;
-        return string.CompareOrdinal(next.Prerelease, current.Prerelease) > 0;
+        return ComparePrerelease(next.Prerelease, current.Prerelease) > 0;
     }
 
     /// <summary>Don't-remind-me applies to one release. A newer release always asks again.</summary>
@@ -64,6 +67,30 @@ public static class AppUpdateRules
         }
         version = new ReleaseVersion(core, prerelease);
         return true;
+    }
+
+    /// <summary>SemVer prerelease ordering: numeric identifiers compare numerically and
+    /// rank below alphanumeric ones; more identifiers win when the shared prefix ties.</summary>
+    private static int ComparePrerelease(string left, string right)
+    {
+        var a = left.Split('.');
+        var b = right.Split('.');
+        for (var i = 0; i < Math.Min(a.Length, b.Length); i++)
+        {
+            var aNumeric = int.TryParse(a[i], out var an);
+            var bNumeric = int.TryParse(b[i], out var bn);
+            int order;
+            if (aNumeric && bNumeric)
+                order = an.CompareTo(bn);
+            else if (aNumeric)
+                order = -1; // numeric identifiers rank lower than alphanumeric ones
+            else if (bNumeric)
+                order = 1;
+            else
+                order = string.CompareOrdinal(a[i], b[i]);
+            if (order != 0) return order;
+        }
+        return a.Length.CompareTo(b.Length);
     }
 
     private readonly record struct ReleaseVersion(Version Core, string Prerelease);

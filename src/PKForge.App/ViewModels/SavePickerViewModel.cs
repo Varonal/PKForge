@@ -98,15 +98,7 @@ public static class SaveDescriptions
         return string.Join(" · ", parts);
     }
 
-    public static string EmulatorName(EmulatorKind kind) => kind switch
-    {
-        EmulatorKind.MelonDS => "melonDS",
-        EmulatorKind.DraStic => "DraStic",
-        EmulatorKind.PizzaBoyGba => "Pizza Boy GBA",
-        EmulatorKind.PizzaBoyGbc => "Pizza Boy GBC",
-        EmulatorKind.CitraMmj => "Citra MMJ",
-        _ => kind.ToString(),
-    };
+    public static string EmulatorName(EmulatorKind kind) => EmulatorCatalog.Name(kind);
 }
 
 public partial class SavePickerViewModel : ObservableObject

@@ -279,13 +279,4 @@ public sealed class SaveEngine : IFormatAwareSaveEngine
         };
         return save.Generation <= 3 && tag != "JA" ? null : tag;
     }
-
-    /// <summary>
-    /// Unbound relocates the PC and extends FireRed's species table, so editing it with
-    /// the stock FireRed engine would corrupt the save. It is recognized (and labeled)
-    /// everywhere, but stays closed until the dedicated Unbound engine ships.
-    /// </summary>
-    private static InvalidOperationException UnboundNotEditable() => new(
-        "Pokémon Unbound is recognized, but its CFRU save layout needs the Unbound editor " +
-        "(coming soon). The save file was not touched.");
 }

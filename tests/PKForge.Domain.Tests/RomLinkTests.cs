@@ -60,6 +60,28 @@ public sealed class RomLinkRulesTests
         Assert.True(EmulatorCatalog.IsInstalled(EmulatorKind.RetroArch, id => id == "com.retroarch.aarch64"));
         Assert.False(EmulatorCatalog.IsInstalled(EmulatorKind.MelonDS, id => id == "com.retroarch"));
     }
+
+    [Fact]
+    public void DisplayNamesAreStable()
+    {
+        Assert.Equal("melonDS", EmulatorCatalog.Name(EmulatorKind.MelonDS));
+        Assert.Equal("DraStic", EmulatorCatalog.Name(EmulatorKind.DraStic));
+        Assert.Equal("Pizza Boy GBA", EmulatorCatalog.Name(EmulatorKind.PizzaBoyGba));
+        Assert.Equal("Pizza Boy GBC", EmulatorCatalog.Name(EmulatorKind.PizzaBoyGbc));
+        Assert.Equal("Citra MMJ", EmulatorCatalog.Name(EmulatorKind.CitraMmj));
+        Assert.Equal("RetroArch", EmulatorCatalog.Name(EmulatorKind.RetroArch));
+        Assert.Equal("Eden", EmulatorCatalog.Name(EmulatorKind.Eden));
+        Assert.Equal("Linkboy", EmulatorCatalog.Name(EmulatorKind.Linkboy));
+        Assert.Equal("Azahar", EmulatorCatalog.Name(EmulatorKind.Azahar));
+        Assert.Equal("Dolphin", EmulatorCatalog.Name(EmulatorKind.Dolphin));
+    }
+
+    [Fact]
+    public void DescribeNamesTheRomAndItsEmulator()
+    {
+        var link = new RomLink("save1", "file:///roms/emerald.gba", "emerald.gba", EmulatorKind.MelonDS, 3, "Pokémon Emerald");
+        Assert.Equal("emerald.gba · melonDS", RomLinkRules.Describe(link));
+    }
 }
 
 public sealed class RomLinkStoreTests : IDisposable
