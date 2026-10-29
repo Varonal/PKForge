@@ -82,7 +82,19 @@ public partial class SecondScreenState : ObservableObject
 
     /// <summary>The Living Dex Autopilot's payload: its route map.</summary>
     [ObservableProperty] private LivingDexRoute? _autopilotRoute;
+
+    /// <summary>The Trophies page's payload: the scanned game's ladder, one record per refresh.</summary>
+    [ObservableProperty] private TrophyLadder? _trophyLadder;
 }
+
+/// <summary>The lower screen's trophy view: the game, its completion, and the recent unlocks.</summary>
+public sealed record TrophyLadder(
+    string GameLabel,
+    int Generation,
+    int Percent,
+    int Unlocked,
+    int Total,
+    IReadOnlyList<(string Title, string Glyph, bool Unlocked, string Detail)> Rows);
 
 /// <summary>What the inspector shows for a surface that drives it: the mon (null = empty slot),
 /// whether its legality verdict is still being computed, and the context line.</summary>

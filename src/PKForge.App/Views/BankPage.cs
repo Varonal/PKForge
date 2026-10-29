@@ -275,11 +275,11 @@ public sealed class BankPage : ContentPage, IPadPagingHandler
         }
         var choice = await PadMenu.ShowAsync(_hostGrid, "Export archive",
             "A folder of .pk files plus a manifest — readable by PKHeX and PKForge alike.",
-            new PadOption("Whole bank", IconPath: "bank"),
-            new PadOption("This box only", IconPath: "box"));
+            new PadOption(AppStrings.Fr ? "Toute la banque" : "Whole bank", IconPath: "bank"),
+            new PadOption(AppStrings.Fr ? "Cette boîte" : "This box only", IconPath: "box"));
         if (choice is null) return;
 
-        var candidates = choice == "This box only"
+        var candidates = choice == (AppStrings.Fr ? "Cette boîte" : "This box only")
             ? _bank.GetAll().Where(e => e.Box == _boxIndex).ToArray()
             : null;
         if (candidates is { Length: 0 })
@@ -287,7 +287,7 @@ public sealed class BankPage : ContentPage, IPadPagingHandler
             _boxViewModel.Status = "Nothing to export — this box is empty.";
             return;
         }
-        await ExportToFolderAsync(candidates, choice == "This box only" ? "this box" : "the whole bank");
+        await ExportToFolderAsync(candidates, choice == (AppStrings.Fr ? "Cette boîte" : "This box only") ? (AppStrings.Fr ? "cette boîte" : "this box") : (AppStrings.Fr ? "toute la banque" : "the whole bank"));
     }
 
     /// <summary>Writes .pk files plus the manifest into a picked folder - the archive path
@@ -333,10 +333,10 @@ public sealed class BankPage : ContentPage, IPadPagingHandler
         {
             var scope = await PadMenu.ShowAsync(_hostGrid, "Export PKSM bank",
                 "Box layout and box names are kept. Gen 9, BDSP and Legends mons have no PKSM slot and are left out.",
-                new PadOption("Whole bank", IconPath: "bank"),
-                new PadOption("This box only", IconPath: "box"));
+                new PadOption(AppStrings.Fr ? "Toute la banque" : "Whole bank", IconPath: "bank"),
+                new PadOption(AppStrings.Fr ? "Cette boîte" : "This box only", IconPath: "box"));
             if (scope is null) return;
-            var box = scope == "This box only";
+            var box = scope == (AppStrings.Fr ? "Cette boîte" : "This box only");
             entries = box ? _bank.GetAll().Where(e => e.Box == _boxIndex).ToArray() : _bank.GetAll();
             (layout, label) = (PksmExportLayout.KeepPositions, box ? $"box {_boxIndex + 1:00}" : "the whole bank");
         }
@@ -716,30 +716,30 @@ public sealed class BankPage : ContentPage, IPadPagingHandler
 
         // Hardcore mode keeps every move and drops every copy: the read-only Summary is always
         // offered, the editor only when editing is allowed; Duplicate and Copy to game are not offered at all.
-        var options = new List<PadOption> { new("Summary", IconPath: "info", Detail: "A read-only look at this Pokémon.") };
+        var options = new List<PadOption> { new(AppStrings.Fr ? "Résumé" : "Summary", IconPath: "info", Detail: "A read-only look at this Pokémon.") };
         if (Allowed(SaveAction.EditMon))
         {
             options.Add(new PadOption("Edit", IconPath: "editor"));
             options.Add(new PadOption("Evolve…", IconPath: "evolve", Detail: "Evolves it right here in the bank."));
         }
-        options.Add(new PadOption("Send to Poképark", IconPath: "park", Detail: "It joins the Poképark visitors. The bank is not changed."));
-        if (Allowed(SaveAction.Duplicate)) options.Add(new PadOption("Duplicate", IconPath: "copy", Detail: "An exact copy goes into the first free bank slot."));
+        options.Add(new PadOption(AppStrings.Fr ? "Envoyer au Poképark" : "Send to Poképark", IconPath: "park", Detail: "It joins the Poképark visitors. The bank is not changed."));
+        if (Allowed(SaveAction.Duplicate)) options.Add(new PadOption(AppStrings.Fr ? "Dupliquer" : "Duplicate", IconPath: "copy", Detail: "An exact copy goes into the first free bank slot."));
         options.Add(new PadOption("Send to game…", IconPath: "send", Detail: "Moves it into a game's boxes and out of the bank."));
         if (Allowed(SaveAction.Duplicate)) options.Add(new PadOption("Copy to game…", IconPath: "copy", Detail: "Puts a copy in a game's boxes; this one stays in the bank."));
         options.Add(new PadOption("Move (carry)", IconPath: "move", Detail: "Pick it up and drop it in another slot."));
-        options.Add(new PadOption("Export .pk file", IconPath: "export", Detail: "Saves this Pokémon as a single .pk file."));
+        options.Add(new PadOption(AppStrings.Fr ? "Exporter en .pk" : "Export .pk file", IconPath: "export", Detail: "Saves this Pokémon as a single .pk file."));
         options.Add(new PadOption("Release from bank", IconPath: "release", Detail: "Removes it from the bank for good; there is no undo."));
-        options.Add(new PadOption("Release to the Wilds", IconPath: "release", Detail: "It leaves the bank and lives on in the wild lands around the Poképark. It may come back to visit."));
+        options.Add(new PadOption(AppStrings.Fr ? "Relâcher dans les terres sauvages" : "Release to the Wilds", IconPath: "release", Detail: "It leaves the bank and lives on in the wild lands around the Poképark. It may come back to visit."));
         var choice = await PadMenu.ShowAsync(_hostGrid, entry.Info.Nickname,
             Note($"From {entry.Info.SourceName} · Gen {entry.Info.Generation} · deposited {entry.AddedUtc:yyyy-MM-dd}"),
             options.ToArray());
         switch (choice)
         {
-            case "Send to Poképark":
+            case var c when c == (AppStrings.Fr ? "Envoyer au Poképark" : "Send to Poképark"):
                 _boxViewModel.Status = IPlatformApplication.Current!.Services.GetRequiredService<PokeparkService>().AddBankVisitor(entry.Id);
                 await PadMenu.ShowAsync(_hostGrid, "Poképark", _boxViewModel.Status, new PadOption("OK"));
                 return;
-            case "Summary":
+            case var c when c == (AppStrings.Fr ? "Résumé" : "Summary"):
                 await OpenSummaryAsync();
                 return;
             case "Edit":
@@ -748,7 +748,7 @@ public sealed class BankPage : ContentPage, IPadPagingHandler
             case "Evolve…":
                 await EvolveEntryAsync(entry);
                 return;
-            case "Duplicate":
+            case var c when c == (AppStrings.Fr ? "Dupliquer" : "Duplicate"):
                 if (await DeniedAsync(SaveAction.Duplicate)) return;
                 var clone = _bank.Add(_bank.GetData(entry.Id), entry.Info);
                 _boxIndex = clone.Box;
@@ -770,7 +770,7 @@ public sealed class BankPage : ContentPage, IPadPagingHandler
                 _carryId = entry.Id;
                 _canvas.InvalidateSurface();
                 return;
-            case "Export .pk file":
+            case var c when c == (AppStrings.Fr ? "Exporter en .pk" : "Export .pk file"):
                 await ExportAsync(entry);
                 return;
             case "Release from bank":
@@ -783,7 +783,7 @@ public sealed class BankPage : ContentPage, IPadPagingHandler
                 UpdatePreview();
                 _canvas.InvalidateSurface();
                 return;
-            case "Release to the Wilds":
+            case var c when c == (AppStrings.Fr ? "Relâcher dans les terres sauvages" : "Release to the Wilds"):
                 await ReleaseToWildsAsync(entry);
                 return;
         }
@@ -870,7 +870,7 @@ public sealed class BankPage : ContentPage, IPadPagingHandler
             case "Move to a position…":
                 await MoveSelectionToPositionAsync(selection);
                 return;
-            case "Duplicate" or "Duplicate all":
+            case var dup when dup == (AppStrings.Fr ? "Dupliquer" : "Duplicate") || dup == (AppStrings.Fr ? "Tout dupliquer" : "Duplicate all"):
                 if (await DeniedAsync(SaveAction.Duplicate)) return;
                 DuplicateSelection(selection);
                 return;
@@ -1429,13 +1429,15 @@ public sealed class BankPage : ContentPage, IPadPagingHandler
         // mode fills the vault only by moving mons in from a save.
         if (await DeniedAsync(SaveAction.CreateMon)) return;
         var choice = await PadMenu.ShowAsync(_hostGrid, "Add to bank", null,
-            new PadOption("Create a Pokémon", IconPath: "create", Detail: "Build a legal Pokémon step by step."),
-            new PadOption("Paste a Showdown set", IconPath: "script", Detail: "Turns a Pokémon Showdown text set into a Pokémon."),
+            new PadOption(AppStrings.Fr ? "Créer un Pokémon" : "Create a Pokémon", IconPath: "create", Detail: "Build a legal Pokémon step by step."),
+            new PadOption(AppStrings.Fr ? "Coller un set Showdown" : "Paste a Showdown set", IconPath: "script", Detail: "Turns a Pokémon Showdown text set into a Pokémon."),
             new PadOption("Import .pk file", IconPath: "import", Detail: "Adds Pokémon from .pk files you pick."),
             new PadOption("Scan a .pk QR", IconPath: "scan", Detail: "Pick a picture of a .pk QR code to add its Pokémon."));
-        switch (choice)
+        // The era-picker flow needs a re-dispatch: the era is picked first, then the
+        // switch below routes on the unchanged choice (goto case needs a constant).
+        if (choice == (AppStrings.Fr ? "Créer un Pokémon" : "Create a Pokémon") || choice == (AppStrings.Fr ? "Coller un set Showdown" : "Paste a Showdown set"))
         {
-            case "Create a Pokémon" or "Paste a Showdown set" when session is null:
+            if (session is null)
             {
                 // No game connected: pick the format, generate against a blank save with
                 // a placeholder identity (OT "PKForge", editable afterwards in the editor).
@@ -1448,10 +1450,11 @@ public sealed class BankPage : ContentPage, IPadPagingHandler
                 var generation = Array.IndexOf(eras, era) + 1;
                 var engine = IPlatformApplication.Current!.Services.GetRequiredService<ISaveEngine>();
                 session = engine.OpenBlankSession(generation);
-                if (choice == "Create a Pokémon") goto case "Create a Pokémon";
-                goto case "Paste a Showdown set";
             }
-            case "Create a Pokémon":
+        }
+        switch (choice)
+        {
+            case var c when c == (AppStrings.Fr ? "Créer un Pokémon" : "Create a Pokémon"):
             {
                 var services = IPlatformApplication.Current!.Services;
                 var data = services.GetRequiredService<IGameDataService>();
@@ -1468,7 +1471,7 @@ public sealed class BankPage : ContentPage, IPadPagingHandler
                 finally { overlay.Close(); }
                 return;
             }
-            case "Paste a Showdown set":
+            case var c when c == (AppStrings.Fr ? "Coller un set Showdown" : "Paste a Showdown set"):
             {
                 var text = await TextPopup.ShowAsync(_hostGrid, "Paste a Showdown set", "The set becomes a legal mon stored in the bank.");
                 if (string.IsNullOrWhiteSpace(text)) return;

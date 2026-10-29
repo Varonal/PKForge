@@ -38,6 +38,16 @@ public sealed class JsonTrophyStore(string? path) : ITrophyStore
         }
     }
 
+    public void Remove(string trophyId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(trophyId);
+        lock (_gate)
+        {
+            if (!_entries.Remove(trophyId)) return;
+            Persist();
+        }
+    }
+
     public void RemoveGame(string gameLabel)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(gameLabel);

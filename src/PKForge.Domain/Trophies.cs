@@ -19,6 +19,8 @@ public enum TrophyKind
     DexComplete = 6,
     /// <summary>A generation-wide slice: every game of the generation linked and scanned.</summary>
     GenerationComplete = 7,
+    /// <summary>The player confirmed it by hand: bosses, events, feats the bytes cannot prove.</summary>
+    Manual = 8,
 }
 
 /// <summary>
@@ -73,6 +75,9 @@ public interface ITrophyStore
 
     void Store(TrophyState state);
 
+    /// <summary>Forgets one trophy's state entirely (a manual trophy the player relocked).</summary>
+    void Remove(string trophyId);
+
     /// <summary>Removes every state of one save's games (the shelf's "remove game").</summary>
     void RemoveGame(string gameLabel);
 }
@@ -108,6 +113,8 @@ public static class TrophyEngine
         TrophyKind.PokemonOwned => scan.PokemonOwned,
         TrophyKind.DexComplete => scan.DexTotal == 0 ? 0 : (int)Math.Round(scan.DexCaught * 100.0 / scan.DexTotal),
         TrophyKind.GenerationComplete => scan.DexTotal == 0 ? 0 : (int)Math.Round(scan.DexCaught * 100.0 / scan.DexTotal),
+        // Manual trophies live outside the scans: only the player's own confirmation unlocks them.
+        TrophyKind.Manual => 0,
         _ => 0,
     };
 

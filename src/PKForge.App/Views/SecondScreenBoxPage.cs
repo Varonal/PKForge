@@ -80,6 +80,11 @@ public sealed class SecondScreenBoxPage : ContentPage
         // The Living Dex Autopilot's route map: cartridges and the Pokémon travelling between them.
         var routeMap = new LivingDexRouteMap(sprites, compact: false) { Margin = new Thickness(14, 12) };
         routeMap.IsVisible = false;
+        // The Trophies page's ladder: the scanned game's milestones on the lower screen.
+        var trophyLadder = new TrophiesLadderView();
+        // The in-game companion: the launched game's dex and restore points while
+        // an emulator owns the foreground.
+        var companion = new GameCompanionView();
 
         // The box cursor's mon, decoded from the live session OFF the UI thread (latest
         // request wins) and cached per (session, edit generation, slot), so a cursor sweep
@@ -155,6 +160,15 @@ public sealed class SecondScreenBoxPage : ContentPage
             var showSummary = bankDriven || (owner == SecondScreenOwner.Box && detail is { IsEmpty: false });
             var showHero = owner == SecondScreenOwner.Home && preview is not null;
             var showRoute = owner == SecondScreenOwner.Autopilot && state?.AutopilotRoute is not null;
+            var showTrophies = owner == SecondScreenOwner.Trophies && state?.TrophyLadder is not null;
+            var companionStore = services?.GetService<Services.GameCompanionStore>();
+            var active = companionStore?.Current;
+            var showCompanion = active is not null;
+            if (showCompanion)
+            {
+                // The emulator owns the foreground: every PKForge surface yields.
+                showJournal = showDex = showOverview = showSummary = showHero = showRoute = showTrophies = false;
+            }
 
             boxSequence++; // any in-flight box decode is now stale
             if (showDex) UpdateDex(species!.Value);
@@ -167,6 +181,8 @@ public sealed class SecondScreenBoxPage : ContentPage
                     ShowBoxSummary(detail!);
             }
             if (showHero) hero.SetGame(preview!);
+            if (showTrophies) trophyLadder.Show(state!.TrophyLadder!);
+            if (active is { } shownCompanion) companion.Show(shownCompanion);
 
             journal.IsVisible = showJournal;
             dex.IsVisible = showDex;
@@ -175,7 +191,9 @@ public sealed class SecondScreenBoxPage : ContentPage
             hero.IsVisible = showHero;
             if (showRoute) routeMap.Show(state!.AutopilotRoute);
             routeMap.IsVisible = showRoute;
-            idle.IsVisible = !showJournal && !showDex && !showOverview && !showSummary && !showHero && !showRoute;
+            trophyLadder.IsVisible = showTrophies;
+            companion.IsVisible = showCompanion;
+            idle.IsVisible = !showJournal && !showDex && !showOverview && !showSummary && !showHero && !showRoute && !showTrophies && !showCompanion;
             PerfTrace.Log("second.swap", swapWatch);
         }
 
@@ -184,7 +202,7 @@ public sealed class SecondScreenBoxPage : ContentPage
             SwapAsync();
             return Task.CompletedTask;
         };
-        Content = new Grid { Children = { DsChrome.GridBackground(), hero, summary, overview, journal, dex, routeMap, idle } };
+        Content = new Grid { Children = { DsChrome.GridBackground(), hero, summary, overview, journal, dex, routeMap, trophyLadder, companion, idle } };
         SwapAsync();
 
         // Selected, LegalityBadge and friends change together on a cursor move: coalesce
@@ -214,6 +232,9 @@ public sealed class SecondScreenBoxPage : ContentPage
                 if (args.PropertyName == nameof(SecondScreenState.AutopilotRoute) && state.Owner == SecondScreenOwner.Autopilot && routeMap.IsVisible)
                     // Every dry-run step publishes a route: feed the map directly, no full swap.
                     MainThread.BeginInvokeOnMainThread(() => routeMap.Show(state.AutopilotRoute));
+                else if (args.PropertyName == nameof(SecondScreenState.TrophyLadder) && state.Owner == SecondScreenOwner.Trophies && state.TrophyLadder is not null)
+                    // The Trophies page publishes its ladder per scan: feed the view directly, no full swap.
+                    MainThread.BeginInvokeOnMainThread(() => trophyLadder.Show(state.TrophyLadder));
                 else if (args.PropertyName == nameof(SecondScreenState.InspectorPage))
                     MainThread.BeginInvokeOnMainThread(() => _inspector.SetPage(state.InspectorPage));
                 else QueueSwap();

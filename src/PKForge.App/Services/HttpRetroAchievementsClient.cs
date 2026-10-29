@@ -66,8 +66,8 @@ public sealed class HttpRetroAchievementsClient(
             {
                 var a = entry.Value;
                 var id = a.TryGetProperty("ID", out var idElement) && idElement.TryGetInt32(out var parsedId) ? parsedId : 0;
-                var earned = a.TryGetProperty("DateEarned", out var dateEarned) && dateEarned.ValueKind == JsonValueKind.String;
-                var earnedHardcore = a.TryGetProperty("DateEarnedHardcore", out var dateHardcore) && dateHardcore.ValueKind == JsonValueKind.String;
+                var earned = HasString(a, "DateEarned");
+                var earnedHardcore = HasString(a, "DateEarnedHardcore");
                 achievements.Add(new RetroAchievement(
                     id,
                     a.TryGetProperty("Title", out var name) ? name.GetString() ?? string.Empty : string.Empty,
@@ -75,7 +75,7 @@ public sealed class HttpRetroAchievementsClient(
                     a.TryGetProperty("Points", out var points) && points.TryGetInt32(out var pointValue) ? pointValue : 0,
                     a.TryGetProperty("BadgeName", out var badge) ? badge.GetString() ?? string.Empty : string.Empty,
                     earned,
-                    earned && ParseTimestamp(a, "DateEarned"),
+                    earned ? ParseTimestamp(a, "DateEarned") : null,
                     earnedHardcore));
             }
         }
@@ -84,6 +84,9 @@ public sealed class HttpRetroAchievementsClient(
         cache.Store(progress);
         return progress;
     }
+
+    private static bool HasString(JsonElement achievement, string property) =>
+        achievement.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String;
 
     /// <summary>RA's "YYYY-MM-DD HH:mm:ss" timestamps, treated as UTC (the site's own clock).</summary>
     private static DateTimeOffset? ParseTimestamp(JsonElement achievement, string property)
