@@ -37,16 +37,24 @@ cmake -B build-android \
   -DBUILD_STATIC=ON -DBUILD_SHARED=OFF \
   -DUSE_FFMPEG=OFF -DUSE_DISCORD_RPC=OFF -DUSE_GDB_STUB=OFF \
   -DUSE_SQLITE3=OFF -DUSE_MINIZIP=OFF -DUSE_PNG=OFF -DUSE_LIBZIP=OFF
-cmake --build build-android --target mgba-static -j"$(nproc)"
+# BUILD_STATIC=ON produces libmgba.a (the standard add_library output name).
+cmake --build build-android -j"$(nproc)"
 
 # 3. The shim links against the static lib.
-"${NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/clang" \
+HOST_TAG="$(uname | tr '[:upper:]' '[:lower:]')-x86_64"
+if [ "${HOST_TAG}" = "darwin-x86_64" ]; then HOST_TAG="darwin-x86_64"; fi
+CLANG="${NDK_HOME}/toolchains/llvm/prebuilt/${HOST_TAG}/bin/clang"
+if [ ! -x "${CLANG}" ]; then
+  # Some NDK releases name it aarch64-linux-...; fall back to any prebuilt dir.
+  CLANG="$(find "${NDK_HOME}/toolchains/llvm/prebuilt" -name clang -type f | head -1)"
+fi
+"${CLANG}" \
   --target="${TRIPLE}${API}" \
   -shared -fPIC -O2 \
-  -I"${PWD}/include" -I"${PWD}/src" \
+  -I"${WORK}/mgba-${MGBA_VERSION}/include" -I"${WORK}/mgba-${MGBA_VERSION}/src" \
   "${HERE}/jni_bridge.c" \
   "${WORK}/mgba-${MGBA_VERSION}/build-android/libmgba.a" \
   -o "${OUT}/libpkforge_mgba.so" \
-  -llog
+  -llog -landroid
 
 echo "Built ${OUT}/libpkforge_mgba.so"

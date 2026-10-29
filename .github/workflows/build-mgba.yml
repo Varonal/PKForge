@@ -1,0 +1,72 @@
+name: build-mgba
+
+# Builds libpkforge_mgba.so (the embedded mGBA core shim) for arm64-v8a and
+# commits it into src/PKForge.App/Libraries/, so the app build picks it up and
+# the emulator runs in-process (the option-A companion). Runs on every push that
+# touches the shim, the script or this workflow, plus a weekly cron for freshness.
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "tools/build-mgba/**"
+      - ".github/workflows/build-mgba.yml"
+  schedule:
+    - cron: "0 4 * * 1" # Mondays 04:00 UTC — keeps the mGBA tarball cache warm
+  workflow_dispatch:
+
+permissions:
+  contents: write # the build commits the .so back to the branch
+
+concurrency:
+  group: build-mgba-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # The commit at the end needs the full history of the branch.
+          fetch-depth: 0
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Resolve the NDK
+        run: |
+          # ubuntu-latest ships the NDK preinstalled; ANDROID_NDK_HOME is set by the
+          # runner image. Verify it exists, and pin the version mGBA was built against.
+          test -n "$ANDROID_NDK_HOME" && test -d "$ANDROID_NDK_HOME"
+          echo "NDK at $ANDROID_NDK_HOME"
+
+      - name: Build the shim
+        run: |
+          chmod +x tools/build-mgba/build.sh
+          NDK_HOME="$ANDROID_NDK_HOME" tools/build-mgba/build.sh
+
+      - name: Verify the output
+        run: |
+          test -f src/PKForge.App/Libraries/arm64-v8a/libpkforge_mgba.so
+          # The library must target arm64 Android, not the runner's x86.
+          file src/PKForge.App/Libraries/arm64-v8a/libpkforge_mgba.so | grep -q "ARM aarch64"
+
+      - name: Commit the .so
+        run: |
+          git config user.name "PKForge CI"
+          git config user.email "ci@pkforge.local"
+          git add src/PKForge.App/Libraries/arm64-v8a/libpkforge_mgba.so
+          if git diff --cached --quiet; then
+            echo "No change to commit."
+            exit 0
+          fi
+          git commit -m "chore(ci): rebuild libpkforge_mgba.so [skip ci]"
+          git push
+
+      - name: Upload the artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libpkforge_mgba-arm64-v8a
+          path: src/PKForge.App/Libraries/arm64-v8a/libpkforge_mgba.so
+          retention-days: 30
+          if-no-files-found: error

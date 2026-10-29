@@ -162,11 +162,13 @@ int pkforg_core_read_bytes(intptr_t coreHandle, uint32_t address, uint8_t* desti
 	if (!core || !destination || length == 0) {
 		return 0;
 	}
-	/* mCoreGetMemoryBlockInfo resolves the block that owns the address; the
-	 * masked variant handles the mirrored regions. */
+	/* mCoreGetMemoryBlockInfo resolves the block that owns the address (mirrors
+	 * included); the read is a single memcpy when the range fits the block,
+	 * per-word bus reads otherwise (unmapped or straddling ranges).
+	 */
 	const struct mCoreMemoryBlock* info = mCoreGetMemoryBlockInfo(core, address);
-	if (!info || address < info->start || address + length > info->start + info->size) {
-		/* Fall back to per-word bus reads for unmapped or straddling ranges. */
+	if (!info || info->size == 0 || address < info->start
+	    || length > (size_t)(info->end - address) || address < info->start) {
 		for (size_t i = 0; i < length; i += 4) {
 			uint32_t word = core->busRead32(core, address + (uint32_t)i);
 			size_t chunk = length - i < 4 ? length - i : 4;
@@ -174,8 +176,9 @@ int pkforg_core_read_bytes(intptr_t coreHandle, uint32_t address, uint8_t* desti
 		}
 		return 1;
 	}
-	void* block = mCoreGetMemoryBlock(core, info->start, &(size_t){0});
-	if (!block) {
+	size_t blockSize = 0;
+	void* block = mCoreGetMemoryBlock(core, info->start, &blockSize);
+	if (!block || blockSize < info->size) {
 		return 0;
 	}
 	memcpy(destination, (uint8_t*)block + (address - info->start), length);
