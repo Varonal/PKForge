@@ -1,6 +1,7 @@
 using PKForge.App.Platforms.Android;
 using PKForge.App.Services;
 using SkiaSharp;
+using SkiaSharp.Views.Maui;
 using SkiaSharp.Views.Maui.Controls;
 
 namespace PKForge.App.Views;

@@ -13,6 +13,8 @@
     <ApplicationVersion>311</ApplicationVersion>
     <ApplicationDisplayVersion>3.1.1</ApplicationDisplayVersion>
     <RuntimeIdentifiers>android-arm64</RuntimeIdentifiers>
+    <!-- The LibraryImport source generator (MgbaNative) emits unsafe interop stubs. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <PropertyGroup Condition="'$(DiagnosticBuild)' == 'true'">
     <!-- Diagnostic builds install beside production and cannot overwrite its app-private data. -->
