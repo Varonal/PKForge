@@ -165,7 +165,7 @@ public sealed class SaveEngineSession : ISaveEngineSession
         }
         if (edit.Nickname is { } nickname && !string.Equals(entity.Nickname, nickname, StringComparison.Ordinal))
         {
-            entity.SetNickname(nickname);
+            entity.SetNickname(TrimToNicknameLimit(nickname, entity));
             changed = true;
         }
         if (edit.Level is { } level && entity.CurrentLevel != Math.Clamp(level, 1, 100))
@@ -268,7 +268,7 @@ public sealed class SaveEngineSession : ISaveEngineSession
         }
         if (edit.OriginalTrainer is { } ot && !string.Equals(entity.OriginalTrainerName, ot, StringComparison.Ordinal))
         {
-            SetOriginalTrainerName(entity, ot, _save);
+            SetOriginalTrainerName(entity, TrimToTrainerNameLimit(ot, entity), _save);
             changed = true;
         }
         if (edit.Gender is { } gender && entity.Gender != Math.Clamp(gender, 0, 2))
@@ -897,11 +897,11 @@ public sealed class SaveEngineSession : ISaveEngineSession
                     break;
                 }
                 case "nickname":
-                    entity.SetNickname(value);
+                    entity.SetNickname(TrimToNicknameLimit(value, entity));
                     changed = true;
                     break;
                 case "ot" or "trainer":
-                    SetOriginalTrainerName(entity, value);
+                    SetOriginalTrainerName(entity, TrimToTrainerNameLimit(value, entity));
                     changed = true;
                     break;
             }
@@ -1639,7 +1639,16 @@ public sealed class SaveEngineSession : ISaveEngineSession
     /// (Japanese: 5 characters and a terminator, the alignment bytes stay zero). A plain
     /// overwrite keeps the old name's tail after the new terminator, which PKHeX rightly flags
     /// as "Final terminator missing". Other formats have no such buffer rule.</summary>
+    /// <summary>
+    /// Cuts a nickname to what the mon's format stores (PKHeX's own per-format buffer size:
+    /// 10 in Gen 1-5, 12 from Gen 6 on, 5 for Japanese Gen 1/2). A longer name would
+    /// overflow the buffer when the string is encoded into the save.
+    /// </summary>
+    internal static string TrimToNicknameLimit(string nickname, PKM entity) =>
+        nickname.Length <= entity.MaxStringLengthNickname ? nickname : nickname[..entity.MaxStringLengthNickname];
+
     internal static void SetOriginalTrainerName(PKM entity, string name, SaveFile? owner = null)
+
     {
         if (entity is PK3 pk3)
         {
@@ -1651,8 +1660,12 @@ public sealed class SaveEngineSession : ISaveEngineSession
             }
             PrefillTrainerName3(trash, pk3.Japanese);
         }
-        entity.OriginalTrainerName = name;
+        entity.OriginalTrainerName = TrimToTrainerNameLimit(name, entity);
     }
+
+    /// <summary>Cuts an OT name to the mon's trainer-name buffer (PKHeX's own per-format size).</summary>
+    internal static string TrimToTrainerNameLimit(string name, PKM entity) =>
+        name.Length <= entity.MaxStringLengthTrainer ? name : name[..entity.MaxStringLengthTrainer];
 
     /// <summary>The Gen 3 naming screen's buffer before a name is written: terminators for
     /// every character the language allows plus one, zero beyond.</summary>

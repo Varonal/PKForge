@@ -85,6 +85,17 @@ public static class EmulatorCatalog
         All.FirstOrDefault(app => app.Kind == kind)
         ?? new EmulatorApp(kind, [kind.ToString().ToLowerInvariant()], RomLaunchStyle.OpenAppOnly);
 
+    /// <summary>The display name of an emulator ("melonDS", "Pizza Boy GBA", ...).</summary>
+    public static string Name(EmulatorKind kind) => kind switch
+    {
+        EmulatorKind.MelonDS => "melonDS",
+        EmulatorKind.DraStic => "DraStic",
+        EmulatorKind.PizzaBoyGba => "Pizza Boy GBA",
+        EmulatorKind.PizzaBoyGbc => "Pizza Boy GBC",
+        EmulatorKind.CitraMmj => "Citra MMJ",
+        _ => kind.ToString(),
+    };
+
     /// <summary>True when any of the emulator's packages is installed.</summary>
     public static bool IsInstalled(EmulatorKind kind, Func<string, bool> isPackageInstalled) =>
         App(kind).PackageIds.Any(isPackageInstalled);

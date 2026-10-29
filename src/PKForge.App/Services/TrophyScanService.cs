@@ -58,7 +58,12 @@ public sealed class TrophyScanService(
                 owned++;
                 if (slot.IsShiny) shinySpecies.Add(species);
             }
-            var playtime = TryParsePlaytime(save.PlayTime);
+            // The save's own playtime counter is the truth; the shelf string is only a
+            // fallback for formats whose stats the engine cannot open.
+            var stats = session.GetTrainerStats();
+            var playtime = stats.SupportsPlayTime && (stats.PlayTimeHours > 0 || stats.PlayTimeMinutes > 0)
+                ? stats.PlayTimeHours
+                : TryParsePlaytime(save.PlayTime);
             return new SaveScanFacts(
                 save.DocumentId,
                 save.EngineHint,

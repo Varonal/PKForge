@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace PKForge.Domain;
 
 /// <summary>The player's RetroAchievements credentials. The API key is a secret: it is
@@ -11,6 +13,63 @@ public interface IRetroCredentialStore
 
     /// <summary>Stores the credentials, or clears them when null.</summary>
     void Save(RetroCredentials? credentials);
+}
+
+/// <summary>
+/// Parses the RetroAchievements web API's JSON, in isolation from HTTP so the mapping
+/// is unit tested. Follows API_GetGameInfoAndUserProgress: an achievement carries
+/// DateEarned/DateEarnedHardcore only once unlocked, but older API responses returned
+/// an empty string for a locked one - presence alone is never proof of an unlock.
+/// </summary>
+public static class RetroAchievementsJson
+{
+    public static bool LooksLikeGame(JsonElement root) =>
+        root.ValueKind == JsonValueKind.Object && root.TryGetProperty("ID", out _);
+
+    public static bool LooksLikeProfile(JsonElement root) =>
+        root.ValueKind == JsonValueKind.Object && root.TryGetProperty("ID", out _);
+
+    public static RetroGameProgress ParseGameProgress(JsonElement root, int requestedGameId)
+    {
+        var title = root.TryGetProperty("Title", out var titleElement) ? titleElement.GetString() ?? string.Empty : string.Empty;
+        var achievements = new List<RetroAchievement>();
+        if (root.TryGetProperty("Achievements", out var set) && set.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var entry in set.EnumerateObject())
+            {
+                var a = entry.Value;
+                var id = a.TryGetProperty("ID", out var idElement) && idElement.TryGetInt32(out var parsedId) ? parsedId : 0;
+                var earned = IsEarned(a, "DateEarned");
+                var earnedHardcore = IsEarned(a, "DateEarnedHardcore");
+                achievements.Add(new RetroAchievement(
+                    id,
+                    a.TryGetProperty("Title", out var name) ? name.GetString() ?? string.Empty : string.Empty,
+                    a.TryGetProperty("Description", out var description) ? description.GetString() ?? string.Empty : string.Empty,
+                    a.TryGetProperty("Points", out var points) && points.TryGetInt32(out var pointValue) ? pointValue : 0,
+                    a.TryGetProperty("BadgeName", out var badge) ? badge.GetString() ?? string.Empty : string.Empty,
+                    earned,
+                    earned ? ParseTimestamp(a, "DateEarned") : null,
+                    earnedHardcore));
+            }
+        }
+        return new RetroGameProgress(requestedGameId, title, [.. achievements.OrderBy(a => a.Id)]);
+    }
+
+    private static bool IsEarned(JsonElement achievement, string property) =>
+        achievement.TryGetProperty(property, out var value)
+        && value.ValueKind == JsonValueKind.String
+        && !string.IsNullOrWhiteSpace(value.GetString());
+
+    /// <summary>RA's "YYYY-MM-DD HH:mm:ss" timestamps, treated as UTC (the site's own clock).</summary>
+    private static DateTimeOffset? ParseTimestamp(JsonElement achievement, string property)
+    {
+        if (!achievement.TryGetProperty(property, out var value) || value.ValueKind != JsonValueKind.String) return null;
+        return DateTimeOffset.TryParse(
+            value.GetString(),
+            System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal,
+            out var parsed) ? parsed : null;
+    }
 }
 
 /// <summary>One official RetroAchievements achievement, as PKForge shows it.</summary>

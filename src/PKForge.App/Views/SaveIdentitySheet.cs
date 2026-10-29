@@ -36,10 +36,10 @@ public static class SaveIdentitySheet
         var options = new List<PadOption>();
         var romLink = RomLinks?.FindBySave(save.DocumentId);
         if (offerOpen) options.Add(new PadOption(OpenOption, IconPath: "play"));
-        if (romLink is { } link)
+        if (romLink is { } linked)
         {
             options.Add(new PadOption(PlayOption, IconPath: "play",
-                Detail: $"Launch {link.RomFileName} in {SaveDescriptions.EmulatorName(link.Emulator)}"));
+                Detail: $"Launch {linked.RomFileName} in {SaveDescriptions.EmulatorName(linked.Emulator)}"));
             options.Add(new PadOption(UnlinkRomOption, IconPath: "unlink", Detail: "Forget this save's ROM. The save file stays."));
         }
         options.Add(new PadOption(LinkRomOption, IconPath: "file",

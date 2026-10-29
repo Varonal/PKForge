@@ -11,7 +11,7 @@ public sealed class TrophyEngineTests
 
     [Theory]
     [InlineData(TrophyKind.DexCaught, 60, 60)]
-    [InlineData(TrophyKind.DexCaught, 30, 59)]
+    [InlineData(TrophyKind.DexCaught, 30, 60)]
     [InlineData(TrophyKind.DexSeen, 100, 100)]
     [InlineData(TrophyKind.ShinyOwned, 5, 5)]
     [InlineData(TrophyKind.PlaytimeHours, 50, 50)]
