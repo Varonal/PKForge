@@ -170,6 +170,10 @@ public sealed class TrophiesPage : ContentPage, IPadHandler
             VerticalOptions = LayoutOptions.Center,
             HorizontalOptions = LayoutOptions.End,
         };
+        // The columns must be assigned: without them all three labels stack in
+        // column 0 (the one-column bug).
+        Grid.SetColumn(name, 1);
+        Grid.SetColumn(value, 2);
         var row = new Grid
         {
             ColumnDefinitions = [new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto)],
