@@ -53,9 +53,10 @@ hors-ligne, sur la console elle-même.
 - [x] Onglet Émulateurs + liaison par console (style Cocoon)
 - [x] Bibliothèque de ROMs avec scan ES-DE et catalogue complet Gen 1-9
 - [x] Launcher Play (RetroArch, melonDS, Azahar, Eden + détection étendue)
-- [x] **GB/GBC/GBA joués nativement dans l'app** : cœur mGBA embarqué
+- [x] **GB/GBC/GBA joués nativement dans l'app, uniquement** : cœur mGBA embarqué
       (`libpkforge_mgba.so`, arm64), rendu SkiaSharp pixel-crisp à 59,7275 Hz,
-      audio 32768 Hz, sauvegardes `.sav` mappées — sans émulateur externe
+      audio 32768 Hz, sauvegardes `.sav` mappées. Les liaisons émulateur externes
+      pour GB/GBC/GBA sont retirées : ces jeux se lancent dans PKForge, point.
 - [x] **Companion live (modèle PokéDaisy)** : pendant qu'un jeu GBA tourne dans
       l'app, le second écran lit la mémoire de la console en direct — dex, équipe,
       temps de jeu — rafraîchi chaque seconde

@@ -195,11 +195,17 @@ public sealed class EmulatorsPage : ContentPage, IPadHandler
         return Kit.Well(line, padding: 10);
     }
 
-    /// <summary>The Cocoon flow: the console's installed emulators, one tap binds.</summary>
+    /// <summary>The Cocoon flow: the console's installed emulators, one tap binds.
+    /// Consoles PKForge runs in-app (GB/GBC/GBA) never reach here: no row, no binding.</summary>
     private async Task ChooseConsoleEmulatorAsync(ConsoleRow row)
     {
+        if (ConsoleRules.RunsInApp(row.Console))
+        {
+            _viewModel.Status = $"{row.Name}: plays in PKForge itself.";
+            return;
+        }
         var candidates = ConsoleRules.EmulatorsFor(row.Console)
-            .Where(kind => EmulatorCatalog.IsInstalled(kind, _launcher.IsInstalled))
+            .Where(kind => kind != EmulatorKind.Embedded && EmulatorCatalog.IsInstalled(kind, _launcher.IsInstalled))
             .ToList();
         if (candidates.Count == 0)
         {
@@ -313,6 +319,9 @@ public sealed class EmulatorsPage : ContentPage, IPadHandler
         var consoles = Enum.GetValues<GameConsole>();
         foreach (var console in consoles)
         {
+            // Consoles PKForge runs in-app (GB/GBC/GBA): no external binding row, ever.
+            if (ConsoleRules.RunsInApp(console))
+                continue;
             var bound = _consoleEmulators.Find(console);
             var anyInstalled = ConsoleRules.AnyInstalled(console, _launcher.IsInstalled);
             if (bound is null && !anyInstalled) continue; // a console nothing can run is not shown

@@ -88,6 +88,7 @@ public static class EmulatorCatalog
     /// <summary>The display name of an emulator ("melonDS", "Pizza Boy GBA", ...).</summary>
     public static string Name(EmulatorKind kind) => kind switch
     {
+        EmulatorKind.Embedded => "PKForge",
         EmulatorKind.MelonDS => "melonDS",
         EmulatorKind.DraStic => "DraStic",
         EmulatorKind.PizzaBoyGba => "Pizza Boy GBA",
@@ -96,9 +97,13 @@ public static class EmulatorCatalog
         _ => kind.ToString(),
     };
 
-    /// <summary>True when any of the emulator's packages is installed.</summary>
+    /// <summary>True when any of the emulator's packages is installed.
+    /// The embedded core has no package: it is installed when the shim is packed in the APK.</summary>
     public static bool IsInstalled(EmulatorKind kind, Func<string, bool> isPackageInstalled) =>
-        App(kind).PackageIds.Any(isPackageInstalled);
+        kind == EmulatorKind.Embedded ? EmbeddedCoreAvailable : App(kind).PackageIds.Any(isPackageInstalled);
+
+    /// <summary>Set by the app at startup: true when libpkforge_mgba.so is packed (the embedded core runs).</summary>
+    public static bool EmbeddedCoreAvailable { get; set; }
 
     /// <summary>The RetroArch core file name (without directories) for a core.</summary>
     public static string CoreFileName(RetroArchCore core) => core switch
@@ -120,12 +125,13 @@ public static class EmulatorCatalog
     };
 
     /// <summary>Every folder grant of this emulator kind, as the Link flow stores them.</summary>
-    public static bool SupportsSaveScan(EmulatorKind kind) => kind != EmulatorKind.Eden && kind != EmulatorKind.Dolphin;
+    public static bool SupportsSaveScan(EmulatorKind kind) => kind != EmulatorKind.Eden && kind != EmulatorKind.Dolphin && kind != EmulatorKind.Embedded;
 
     /// <summary>The systems whose ROMs this emulator runs, for the launcher's expectations.</summary>
     public static string SystemsOf(EmulatorKind kind) => kind switch
     {
-        EmulatorKind.RetroArch => "GB, GBC, GBA, DS",
+        EmulatorKind.Embedded => "GB, GBC, GBA",
+        EmulatorKind.RetroArch => "DS",
         EmulatorKind.MelonDS => "Nintendo DS",
         EmulatorKind.Azahar or EmulatorKind.CitraMmj => "Nintendo 3DS",
         EmulatorKind.Eden => "Nintendo Switch",

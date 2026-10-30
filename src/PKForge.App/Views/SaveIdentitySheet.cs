@@ -38,13 +38,16 @@ public static class SaveIdentitySheet
         if (offerOpen) options.Add(new PadOption(OpenOption, IconPath: "play"));
         if (romLink is { } linked)
         {
+            var where = linked.Generation is >= 1 and <= 3
+                ? (AppStrings.Fr ? "dans PKForge" : "in PKForge")
+                : $"in {SaveDescriptions.EmulatorName(linked.Emulator)}";
             options.Add(new PadOption(PlayOption, IconPath: "play",
-                Detail: $"Launch {linked.RomFileName} in {SaveDescriptions.EmulatorName(linked.Emulator)}"));
-            options.Add(new PadOption(UnlinkRomOption, IconPath: "unlink", Detail: "Forget this save's ROM. The save file stays."));
+                Detail: AppStrings.Fr ? $"Lancer {linked.RomFileName} {where}" : $"Launch {linked.RomFileName} {where}"));
+            options.Add(new PadOption(UnlinkRomOption, IconPath: "unlink", Detail: AppStrings.Fr ? "Oublie la ROM de cette sauvegarde. Le fichier de sauvegarde reste." : "Forget this save's ROM. The save file stays."));
         }
         options.Add(new PadOption(LinkRomOption, IconPath: "file",
             Detail: romLink is null
-                ? (AppStrings.Fr ? "Choisissez la ROM de ce jeu une fois ; Jouer la lancera dans son émulateur." : "Pick this game's ROM once; Play then launches it in its emulator.")
+                ? (AppStrings.Fr ? "Choisissez la ROM de ce jeu une fois ; Jouer la lancera dans PKForge (GB/GBA) ou son émulateur." : "Pick this game's ROM once; Play then launches it in PKForge (GB/GBA) or its emulator.")
                 : (AppStrings.Fr ? $"Remplacer {romLink.RomFileName}." : $"Replace {romLink.RomFileName}.")));
         options.Add(new PadOption(RenameOption, IconPath: "rename"));
         options.Add(new PadOption(ColorOption, Glyph: "●", Accent: SaveColors.For(resolved?.ColorKey, save.Generation),
@@ -112,9 +115,15 @@ public static class SaveIdentitySheet
 
     private static IDocumentPicker? FilePicker => IPlatformApplication.Current?.Services.GetService<IDocumentPicker>();
 
-    /// <summary>Hands a linked ROM to its emulator; the fallback opens the emulator's library.</summary>
+    /// <summary>Launches a linked ROM: GB/GBC/GBA (Gen 1-3) play in PKForge itself via the
+    /// embedded core; anything else is handed to its external emulator.</summary>
     private static async Task LaunchAsync(Grid host, RomLink link)
     {
+        if (link.Generation is >= 1 and <= 3)
+        {
+            await LaunchEmbeddedAsync(host, link);
+            return;
+        }
         var launcher = Launcher;
         if (launcher is null) return;
         if (await launcher.LaunchAsync(link))
@@ -126,6 +135,38 @@ public static class SaveIdentitySheet
         }
         await PadMenu.ShowAsync(host, "Could not launch",
             $"{SaveDescriptions.EmulatorName(link.Emulator)} did not accept {link.RomFileName}. Open the game from its library instead.", "OK");
+    }
+
+    /// <summary>Opens the linked GB/GBC/GBA ROM in the embedded game screen.</summary>
+    private static async Task LaunchEmbeddedAsync(Grid host, RomLink link)
+    {
+        var save = FindSaveFor(link.RomUri);
+        var session = await Task.Run(() => Platforms.Android.EmbeddedGameSession.TryStart(link.RomUri, save));
+        if (session is null)
+        {
+            await PadMenu.ShowAsync(host, "Could not launch",
+                $"{link.RomFileName}: the embedded core is not packed in this build.", "OK");
+            return;
+        }
+        await MainThread.InvokeOnMainThreadAsync(async () =>
+        {
+            if (Microsoft.Maui.Controls.Application.Current?.Windows.FirstOrDefault()?.Page is { } page)
+                await page.Navigation.PushAsync(new EmbeddedGamePage(session));
+        });
+    }
+
+    /// <summary>The save file mGBA's convention names for a ROM, when it exists.</summary>
+    private static string? FindSaveFor(string romPath)
+    {
+        try
+        {
+            var save = System.IO.Path.ChangeExtension(romPath, ".sav");
+            return File.Exists(save) ? save : null;
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
     }
 
     /// <summary>Picks a ROM for this save: the library first (one tap), the file picker as the manual path.</summary>
@@ -151,18 +192,20 @@ public static class SaveIdentitySheet
 
         if (candidates.FirstOrDefault(r => r.FileName == choice) is { } fromLibrary)
         {
-            var launcher = Launcher;
-            var bound = IPlatformApplication.Current?.Services.GetService<IConsoleEmulatorStore>()?.Find(fromLibrary.Console);
-            var fallback = launcher is null ? default
-                : ConsoleRules.EmulatorsFor(fromLibrary.Console)
-                    .FirstOrDefault(kind => EmulatorCatalog.IsInstalled(kind, launcher.IsInstalled));
-            if (bound is null && fallback == default)
+            // Gen 1-3 (GB/GBC/GBA) always launch embedded in PKForge; the console binding
+            // only matters for the consoles that still need an external emulator.
+            var kind = ConsoleRules.RunsInApp(fromLibrary.Console)
+                ? EmulatorKind.Embedded
+                : IPlatformApplication.Current?.Services.GetService<IConsoleEmulatorStore>()?.Find(fromLibrary.Console)
+                    ?? ConsoleRules.EmulatorsFor(fromLibrary.Console)
+                        .FirstOrDefault(k => k != EmulatorKind.Embedded && EmulatorCatalog.IsInstalled(k, Launcher is { } l ? l.IsInstalled : _ => false));
+            if (kind == default && !ConsoleRules.RunsInApp(fromLibrary.Console))
             {
                 await PadMenu.ShowAsync(host, AppStrings.RomMissing,
                     $"Bind an emulator for the {fromLibrary.Console} in the Emulators tab, or install one.", "OK");
                 return;
             }
-            links.Set(new RomLink(save.DocumentId, fromLibrary.FilePath, fromLibrary.FileName, bound ?? fallback, save.Generation, save.EngineHint));
+            links.Set(new RomLink(save.DocumentId, fromLibrary.FilePath, fromLibrary.FileName, kind, save.Generation, save.EngineHint));
             return;
         }
 
@@ -180,7 +223,7 @@ public static class SaveIdentitySheet
                 $"PKForge cannot launch a Gen {save.Generation} game from {name}. Link a ROM for a Game Boy, GBA or Nintendo DS Pokémon game instead.", "OK");
             return;
         }
-        var installed = emulators.Where(kind => Launcher is { } launcher && EmulatorCatalog.IsInstalled(kind, launcher.IsInstalled)).ToArray();
+        var installed = emulators.Where(kind => EmulatorCatalog.IsInstalled(kind, Launcher is { } l ? l.IsInstalled : _ => false)).ToArray();
         if (installed.Length == 0)
         {
             await PadMenu.ShowAsync(host, AppStrings.RomMissing,

@@ -14,6 +14,10 @@ public enum EmulatorKind
     PizzaBoyGbc = 8,
     /// <summary>Citra MMJ (weihuoya fork, org.citra.emu): same SDMC layout as Azahar, rooted at citra-emu/.</summary>
     CitraMmj = 9,
+    /// <summary>PKForge itself: the embedded mGBA core (libpkforge_mgba.so) runs GB/GBC/GBA
+    /// in-process. Not a package — IsInstalled is always false; it is "installed" when the
+    /// shim is packed in the APK.</summary>
+    Embedded = 10,
 }
 
 /// <summary>A persistable SAF folder grant, opaque to the domain layer.</summary>

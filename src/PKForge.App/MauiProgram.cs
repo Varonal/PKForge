@@ -20,6 +20,8 @@ public static class MauiProgram
         App.Trace("CreateMauiApp enter");
 #if ANDROID
         Views.CapsuleSkin.Register();
+        // Probe the embedded mGBA shim once: GB/GBC/GBA play in-app only when it is packed.
+        Domain.EmulatorCatalog.EmbeddedCoreAvailable = Platforms.Android.EmbeddedGameSession.IsAvailable;
 #endif
         builder.UseMauiApp<App>().UseSkiaSharp()
             .ConfigureFonts(fonts =>

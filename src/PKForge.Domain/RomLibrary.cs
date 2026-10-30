@@ -68,13 +68,17 @@ public static class ConsoleRules
         _ => [],
     };
 
-    /// <summary>The emulators that can run a console's ROMs, best first — the Cocoon choice list.</summary>
+    /// <summary>True when PKForge runs this console's games itself (the embedded core),
+    /// so no external emulator may be bound or chosen for it.</summary>
+    public static bool RunsInApp(GameConsole console) =>
+        console is GameConsole.GameBoy or GameConsole.GameBoyColor or GameConsole.GameBoyAdvance;
+
+    /// <summary>The emulators that can run a console's ROMs, best first — the Cocoon choice list.
+    /// GB/GBC/GBA run in PKForge itself (the embedded core); no external emulator is offered.</summary>
     public static IReadOnlyList<EmulatorKind> EmulatorsFor(GameConsole console) => console switch
     {
-        GameConsole.GameBoy or GameConsole.GameBoyColor =>
-            [EmulatorKind.RetroArch, EmulatorKind.Linkboy, EmulatorKind.PizzaBoyGbc],
-        GameConsole.GameBoyAdvance =>
-            [EmulatorKind.RetroArch, EmulatorKind.Linkboy, EmulatorKind.PizzaBoyGba],
+        GameConsole.GameBoy or GameConsole.GameBoyColor or GameConsole.GameBoyAdvance =>
+            [EmulatorKind.Embedded],
         GameConsole.NintendoDs =>
             [EmulatorKind.MelonDS, EmulatorKind.RetroArch, EmulatorKind.DraStic],
         GameConsole.Nintendo3Ds =>
@@ -84,9 +88,10 @@ public static class ConsoleRules
         _ => [],
     };
 
-    /// <summary>True when one of the emulators that run this console is installed.</summary>
+    /// <summary>True when one of the emulators that run this console is installed.
+    /// The embedded core counts as installed when the shim is packed (see the caller).</summary>
     public static bool AnyInstalled(GameConsole console, Func<string, bool> isPackageInstalled) =>
-        EmulatorsFor(console).Any(kind => EmulatorCatalog.IsInstalled(kind, isPackageInstalled));
+        EmulatorsFor(console).Any(kind => kind == EmulatorKind.Embedded || EmulatorCatalog.IsInstalled(kind, isPackageInstalled));
 }
 
 /// <summary>
