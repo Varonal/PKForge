@@ -29,10 +29,11 @@ public sealed class RomLinkRulesTests
         Assert.Empty(RomLinkRules.EmulatorsForRom(generation, rom));
 
     [Theory]
-    [InlineData(EmulatorKind.RetroArch, true)]   // RetroActivityFuture extras
-    [InlineData(EmulatorKind.MelonDS, true)]     // EmulatorActivity PATH extra
-    [InlineData(EmulatorKind.Azahar, false)]     // no documented handoff: opens its library
-    [InlineData(EmulatorKind.Eden, false)]
+    [InlineData(EmulatorKind.RetroArch, true)]   // package-scoped MAIN + content extras
+    [InlineData(EmulatorKind.MelonDS, true)]     // package-scoped VIEW with the ROM URI
+    [InlineData(EmulatorKind.Azahar, true)]      // VIEW handoff: the game loads
+    [InlineData(EmulatorKind.Eden, true)]
+    [InlineData(EmulatorKind.Dolphin, false)]    // no documented handoff: opens its library
     public void DirectHandoffOnlyForEmulatorsThatDocumentOne(EmulatorKind kind, bool canLaunch) =>
         Assert.Equal(canLaunch, RomLinkRules.CanLaunchRom(kind));
 
@@ -50,7 +51,8 @@ public sealed class RomLinkRulesTests
     public void CatalogNamesStablePackages()
     {
         Assert.Equal("com.retroarch", EmulatorCatalog.App(EmulatorKind.RetroArch).PrimaryPackage);
-        Assert.Equal("me.magnum.melonds", EmulatorCatalog.App(EmulatorKind.MelonDS).PrimaryPackage);
+        Assert.Equal("io.github.melonds", EmulatorCatalog.App(EmulatorKind.MelonDS).PrimaryPackage);
+        Assert.Contains("me.magnum.melonds", EmulatorCatalog.App(EmulatorKind.MelonDS).PackageIds);
         Assert.Contains("com.retroarch.aarch64", EmulatorCatalog.App(EmulatorKind.RetroArch).PackageIds);
     }
 

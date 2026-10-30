@@ -42,6 +42,7 @@ coverage/
 tools/**/out/
 tools/**/bin/
 tools/**/obj/
+tools/**/build/
 /pkhex/
 /PKSafe/
 src/PKForge.App/Resources/Raw/sgdb.key

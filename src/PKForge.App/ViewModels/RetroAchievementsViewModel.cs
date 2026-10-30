@@ -29,7 +29,7 @@ public partial class RetroAchievementsViewModel(
 
     private readonly Dictionary<int, IReadOnlyList<(int Id, string Title, string Console)>> _consoleGames = [];
 
-    [ObservableProperty] private string _status = "Sign in to RetroAchievements to see official achievements.";
+    [ObservableProperty] private string _status = Services.AppStrings.Fr ? "Connectez-vous à RetroAchievements pour voir les succès officiels." : "Sign in to RetroAchievements to see official achievements.";
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private bool _signedIn;
 
@@ -60,7 +60,7 @@ public partial class RetroAchievementsViewModel(
         credentials.Save(null);
         Games.Clear();
         SignedIn = false;
-        Status = "Signed out. Official achievements stay on retroachievements.org.";
+        Status = Services.AppStrings.SignedOut;
     }
 
     [RelayCommand]
@@ -70,7 +70,7 @@ public partial class RetroAchievementsViewModel(
         var username = CurrentUsername;
         if (string.IsNullOrWhiteSpace(username))
         {
-            Status = "Enter your RetroAchievements username first.";
+            Status = Services.AppStrings.Fr ? "Saisissez d'abord votre nom d'utilisateur RetroAchievements." : "Enter your RetroAchievements username first.";
             return;
         }
         try
@@ -80,18 +80,18 @@ public partial class RetroAchievementsViewModel(
             if (await client.VerifyCredentialsAsync())
             {
                 SignedIn = true;
-                Status = $"Signed in as {username}.";
+                Status = Services.AppStrings.SignedInAs(username);
             }
             else
             {
                 credentials.Save(null);
-                Status = "RetroAchievements did not recognise those credentials.";
+                Status = Services.AppStrings.RaBadCredentials;
             }
         }
         catch (Exception error)
         {
             credentials.Save(null);
-            Status = $"Sign-in failed: {error.Message}";
+            Status = Services.AppStrings.RaSignInFailed(error.Message);
         }
         finally
         {
@@ -167,12 +167,12 @@ public partial class RetroAchievementsViewModel(
                 Games.Add(view);
             }
             Status = Games.Count == 0
-                ? "No official achievement sets found for your Gen 1-5 games."
-                : $"{Games.Count} game set(s) loaded.";
+                ? Services.AppStrings.RaNoSets
+                : (Services.AppStrings.Fr ? $"{Games.Count} set(s) de jeu chargé(s)." : $"{Games.Count} game set(s) loaded.");
         }
         catch (Exception error)
         {
-            Status = $"Could not reach RetroAchievements: {error.Message}. Cached progress is shown.";
+            Status = Services.AppStrings.Fr ? $"RetroAchievements injoignable : {error.Message}. La progression en cache est affichée." : $"Could not reach RetroAchievements: {error.Message}. Cached progress is shown.";
             foreach (var progress in cache.GetAll())
                 AddGame(progress);
         }

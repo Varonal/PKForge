@@ -24,6 +24,31 @@ public sealed class MainActivity : MauiAppCompatActivity
     {
         base.OnCreate(savedInstanceState);
         if (savedInstanceState is null) MoveToMainScreenIfLaunchedBelow();
+        RequestAllFilesAccessIfNeeded();
+    }
+
+    /// <summary>
+    /// The ROM library reads /storage/emulated/0/ROMs directly (the ES-DE layout emulators
+    /// themselves use), which needs "All files access". Android 11+ grants it through the
+    /// settings screen: the app opens it once, and only when the grant is missing.
+    /// </summary>
+    private static void RequestAllFilesAccessIfNeeded()
+    {
+        if (!OperatingSystem.IsAndroidVersionAtLeast(30)) return;
+        try
+        {
+            if (Android.OS.Environment.IsExternalStorageManager == true) return;
+            var intent = new Android.Content.Intent(
+                Android.Provider.Settings.ActionManageAppAllFilesAccessPermission,
+                Android.Net.Uri.Parse($"package:{Platform.AppContext?.PackageName}"));
+            intent.AddFlags(ActivityFlags.NewTask);
+            Platform.AppContext?.StartActivity(intent);
+        }
+        catch (Exception error) when (error is Android.Content.ActivityNotFoundException or Java.Lang.SecurityException)
+        {
+            // Some builds have no All-files screen: the library's scan simply finds no root.
+            Services.AppLog.Info("storage", "The All files access screen is unavailable on this build.");
+        }
     }
 
     /// <summary>
