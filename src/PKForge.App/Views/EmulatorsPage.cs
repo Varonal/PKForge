@@ -313,6 +313,9 @@ public sealed class EmulatorsPage : ContentPage, IPadHandler
         var consoles = Enum.GetValues<GameConsole>();
         foreach (var console in consoles)
         {
+            // GB/GBC/GBA play in PKForge itself (the embedded core): no external binding row.
+            if (console is GameConsole.GameBoy or GameConsole.GameBoyColor or GameConsole.GameBoyAdvance)
+                continue;
             var bound = _consoleEmulators.Find(console);
             var anyInstalled = ConsoleRules.AnyInstalled(console, _launcher.IsInstalled);
             if (bound is null && !anyInstalled) continue; // a console nothing can run is not shown

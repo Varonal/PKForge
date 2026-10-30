@@ -36,6 +36,23 @@ public sealed class EmbeddedGameSession : IDisposable
     /// null when the embedded core is unavailable (no library) or the file is not
     /// a GBA/GB ROM — the caller falls back to the external emulator path.
     /// </summary>
+    /// <summary>True when libpkforge_mgba.so is packed in this APK (the embedded core can run).</summary>
+    public static bool IsAvailable
+    {
+        get
+        {
+            try
+            {
+                var core = new MgbaCore();
+                core.Dispose();
+                Domain.EmulatorCatalog.EmbeddedCoreAvailable = true;
+                return true;
+            }
+            catch (DllNotFoundException) { return false; }
+            catch (EntryPointNotFoundException) { return false; }
+        }
+    }
+
     public static EmbeddedGameSession? TryStart(string romPath, string? savePath)
     {
         try
@@ -49,11 +66,11 @@ public sealed class EmbeddedGameSession : IDisposable
         }
         catch (DllNotFoundException)
         {
-            return null; // the .so is not packed in this build — external emulators only
+            return null; // the .so is not packed in this build — no embedded play
         }
         catch (EntryPointNotFoundException)
         {
-            return null; // the .so is older than the shim — external emulators only
+            return null; // the .so is older than the shim — no embedded play
         }
     }
 

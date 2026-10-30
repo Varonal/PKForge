@@ -52,8 +52,7 @@ public static class RomLinkRules
             return [];
         return generation switch
         {
-            1 or 2 => [EmulatorKind.RetroArch, EmulatorKind.Linkboy, EmulatorKind.PizzaBoyGbc],
-            3 => [EmulatorKind.RetroArch, EmulatorKind.Linkboy, EmulatorKind.PizzaBoyGba],
+            1 or 2 or 3 => [EmulatorKind.Embedded],
             4 or 5 => [EmulatorKind.MelonDS, EmulatorKind.RetroArch, EmulatorKind.DraStic],
             _ => [],
         };

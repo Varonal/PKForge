@@ -6,10 +6,10 @@ namespace PKForge.Domain.Tests;
 public sealed class RomLinkRulesTests
 {
     [Theory]
-    [InlineData(1, "Pokemon - Red Version.gb", EmulatorKind.RetroArch)]
-    [InlineData(2, "Pokemon - Crystal Version.gbc", EmulatorKind.RetroArch)]
-    [InlineData(2, "Pokemon - Crystal Version.zip", EmulatorKind.RetroArch)]
-    [InlineData(3, "Pokemon - Emerald Version.gba", EmulatorKind.RetroArch)]
+    [InlineData(1, "Pokemon - Red Version.gb", EmulatorKind.Embedded)]
+    [InlineData(2, "Pokemon - Crystal Version.gbc", EmulatorKind.Embedded)]
+    [InlineData(2, "Pokemon - Crystal Version.zip", EmulatorKind.Embedded)]
+    [InlineData(3, "Pokemon - Emerald Version.gba", EmulatorKind.Embedded)]
     [InlineData(4, "Pokemon - Diamond Version.nds", EmulatorKind.MelonDS)]
     [InlineData(5, "Pokemon - Black Version 2.nds", EmulatorKind.MelonDS)]
     public void PrefersTheEmulatorThatRunsTheGeneration(int generation, string rom, EmulatorKind first)

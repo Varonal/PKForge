@@ -287,9 +287,24 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
         mark.IsVisible = false;
     }
 
-    /// <summary>A tap launches: the console's bound emulator, and the ROM's plain path.</summary>
+    /// <summary>A tap launches the game. GB/GBC/GBA always play in PKForge itself
+    /// (the embedded core); the other consoles go to their bound external emulator.</summary>
     private async Task LaunchAsync(LibraryRom rom)
     {
+        // GB/GBC/GBA: embedded first and only — no external emulator is consulted.
+        if (rom.Console is GameConsole.GameBoy or GameConsole.GameBoyColor or GameConsole.GameBoyAdvance)
+        {
+            var save = FindSaveFor(rom.FilePath);
+            var session = await Task.Run(() => Platforms.Android.EmbeddedGameSession.TryStart(rom.FilePath, save));
+            if (session is not null)
+            {
+                await MainThread.InvokeOnMainThreadAsync(() => Navigation.PushAsync(new EmbeddedGamePage(session)));
+                return;
+            }
+            await PadMenu.ShowAsync(_hostGrid, AppStrings.RomMissing,
+                $"{rom.GameName}: the embedded core is not packed in this build.", AppStrings.Ok);
+            return;
+        }
         var bound = _consoleEmulators.Find(rom.Console);
         var fallback = ConsoleRules.EmulatorsFor(rom.Console)
             .FirstOrDefault(kind => EmulatorCatalog.IsInstalled(kind, _launcher.IsInstalled));
@@ -300,19 +315,6 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
             return;
         }
         var kind = bound ?? fallback;
-        // GB/GBC/GBA play embedded when the core is packed (option A): the game
-        // runs in-process, its memory readable live by the companion. Anything
-        // else (or no library) keeps the external emulator path.
-        if (rom.Console is GameConsole.GameBoy or GameConsole.GameBoyColor or GameConsole.GameBoyAdvance)
-        {
-            var save = FindSaveFor(rom.FilePath);
-            var session = await Task.Run(() => Platforms.Android.EmbeddedGameSession.TryStart(rom.FilePath, save));
-            if (session is not null)
-            {
-                await MainThread.InvokeOnMainThreadAsync(() => Navigation.PushAsync(new EmbeddedGamePage(session)));
-                return;
-            }
-        }
         var link = new RomLink("library", rom.FilePath, rom.FileName, kind,
             RomNameRules.GenerationOf(rom.GameName), $"Pokémon {rom.GameName}");
         if (await _launcher.LaunchAsync(link))

@@ -271,7 +271,10 @@ public sealed class ConsoleRulesTests
     [Fact]
     public void EachConsoleNamesItsEmulatorsInPreferenceOrder()
     {
-        Assert.Equal(EmulatorKind.RetroArch, ConsoleRules.EmulatorsFor(GameConsole.GameBoy)[0]);
+        // GB/GBC/GBA play in PKForge itself — the embedded core, no external emulator.
+        Assert.Equal([EmulatorKind.Embedded], ConsoleRules.EmulatorsFor(GameConsole.GameBoy));
+        Assert.Equal([EmulatorKind.Embedded], ConsoleRules.EmulatorsFor(GameConsole.GameBoyColor));
+        Assert.Equal([EmulatorKind.Embedded], ConsoleRules.EmulatorsFor(GameConsole.GameBoyAdvance));
         Assert.Equal(EmulatorKind.MelonDS, ConsoleRules.EmulatorsFor(GameConsole.NintendoDs)[0]);
         Assert.Equal(EmulatorKind.Azahar, ConsoleRules.EmulatorsFor(GameConsole.Nintendo3Ds)[0]);
         Assert.Equal(EmulatorKind.Eden, ConsoleRules.EmulatorsFor(GameConsole.NintendoSwitch)[0]);
@@ -280,7 +283,9 @@ public sealed class ConsoleRulesTests
     [Fact]
     public void InstallChecksFollowThePreferenceList()
     {
-        Assert.True(ConsoleRules.AnyInstalled(GameConsole.GameBoy, id => id == "com.retroarch.aarch64"));
+        // The embedded core needs no package: GB is "installed" regardless of packages.
+        Assert.True(ConsoleRules.AnyInstalled(GameConsole.GameBoy, _ => false));
+        Assert.True(ConsoleRules.AnyInstalled(GameConsole.NintendoDs, id => id == "io.github.melonds"));
         Assert.False(ConsoleRules.AnyInstalled(GameConsole.Nintendo3Ds, id => id == "com.retroarch"));
     }
 }
