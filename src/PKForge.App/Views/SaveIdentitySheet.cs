@@ -194,12 +194,12 @@ public static class SaveIdentitySheet
         {
             // Gen 1-3 (GB/GBC/GBA) always launch embedded in PKForge; the console binding
             // only matters for the consoles that still need an external emulator.
-            var kind = fromLibrary.Console is GameConsole.GameBoy or GameConsole.GameBoyColor or GameConsole.GameBoyAdvance
+            var kind = ConsoleRules.RunsInApp(fromLibrary.Console)
                 ? EmulatorKind.Embedded
                 : IPlatformApplication.Current?.Services.GetService<IConsoleEmulatorStore>()?.Find(fromLibrary.Console)
                     ?? ConsoleRules.EmulatorsFor(fromLibrary.Console)
-                        .FirstOrDefault(k => EmulatorCatalog.IsInstalled(k, Launcher is { } l ? l.IsInstalled : _ => false));
-            if (kind == default && fromLibrary.Console is not (GameConsole.GameBoy or GameConsole.GameBoyColor or GameConsole.GameBoyAdvance))
+                        .FirstOrDefault(k => k != EmulatorKind.Embedded && EmulatorCatalog.IsInstalled(k, Launcher is { } l ? l.IsInstalled : _ => false));
+            if (kind == default && !ConsoleRules.RunsInApp(fromLibrary.Console))
             {
                 await PadMenu.ShowAsync(host, AppStrings.RomMissing,
                     $"Bind an emulator for the {fromLibrary.Console} in the Emulators tab, or install one.", "OK");

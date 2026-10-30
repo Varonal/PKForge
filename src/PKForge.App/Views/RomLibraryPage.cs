@@ -291,8 +291,9 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
     /// (the embedded core); the other consoles go to their bound external emulator.</summary>
     private async Task LaunchAsync(LibraryRom rom)
     {
-        // GB/GBC/GBA: embedded first and only — no external emulator is consulted.
-        if (rom.Console is GameConsole.GameBoy or GameConsole.GameBoyColor or GameConsole.GameBoyAdvance)
+        // Consoles PKForge runs in-app (GB/GBC/GBA): embedded first and only —
+        // a stale binding or an installed external emulator is never consulted.
+        if (ConsoleRules.RunsInApp(rom.Console))
         {
             var save = FindSaveFor(rom.FilePath);
             var session = await Task.Run(() => Platforms.Android.EmbeddedGameSession.TryStart(rom.FilePath, save));

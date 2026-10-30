@@ -280,6 +280,31 @@ public sealed class ConsoleRulesTests
         Assert.Equal(EmulatorKind.Eden, ConsoleRules.EmulatorsFor(GameConsole.NintendoSwitch)[0]);
     }
 
+    [Theory]
+    [InlineData(GameConsole.GameBoy)]
+    [InlineData(GameConsole.GameBoyColor)]
+    [InlineData(GameConsole.GameBoyAdvance)]
+    public void InAppConsolesNeverOfferAnExternalEmulator(GameConsole console)
+    {
+        // The single source of truth for "this console runs in PKForge": every candidate
+        // list for it is exactly [Embedded] — no RetroArch/Linkboy/PizzaBoy can leak in.
+        Assert.True(ConsoleRules.RunsInApp(console));
+        Assert.Equal([EmulatorKind.Embedded], ConsoleRules.EmulatorsFor(console));
+        Assert.DoesNotContain(ConsoleRules.EmulatorsFor(console),
+            kind => kind != EmulatorKind.Embedded);
+    }
+
+    [Theory]
+    [InlineData(GameConsole.NintendoDs)]
+    [InlineData(GameConsole.Nintendo3Ds)]
+    [InlineData(GameConsole.GameCube)]
+    [InlineData(GameConsole.NintendoSwitch)]
+    public void ExternalConsolesAreNotMarkedInApp(GameConsole console)
+    {
+        Assert.False(ConsoleRules.RunsInApp(console));
+        Assert.DoesNotContain(EmulatorKind.Embedded, ConsoleRules.EmulatorsFor(console));
+    }
+
     [Fact]
     public void InstallChecksFollowThePreferenceList()
     {

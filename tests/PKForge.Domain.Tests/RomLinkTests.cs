@@ -20,6 +20,16 @@ public sealed class RomLinkRulesTests
     }
 
     [Theory]
+    [InlineData(1, "Pokemon - Red Version.gb")]
+    [InlineData(2, "Pokemon - Crystal Version.gbc")]
+    [InlineData(3, "Pokemon - Emerald Version.gba")]
+    public void GenOneToThreeRomsHaveEmbeddedAsTheirOnlyRoute(int generation, string rom)
+    {
+        // Gen 1-3 ROMs can never be handed to an external emulator.
+        Assert.Equal([EmulatorKind.Embedded], RomLinkRules.EmulatorsForRom(generation, rom));
+    }
+
+    [Theory]
     [InlineData(3, "Pokemon - Emerald Version.nds")]     // a GBA game on a DS file
     [InlineData(4, "Pokemon - Diamond Version.gba")]     // a DS game on a GBA file
     [InlineData(1, "Pokemon - Red Version.3ds")]         // nothing runnable
