@@ -20,9 +20,9 @@ public sealed class TrophyEngineTests
     {
         // One scan, fixed facts: each kind reads its own number, whatever the threshold.
         var scan = Facts(caught: 60, seen: 100, shiny: 5, owned: 120, hours: 50);
-        var trophy = new TrophyDefinition("t", "Pokémon Red", 1, kind, measured + 1, "T", "D");
+        var trophy = new TrophyDefinition("t", "Pokémon Red", 1, kind, threshold + 1, "T", "D");
         var state = TrophyEngine.Evaluate(trophy, scan);
-        Assert.Equal(measured, state.Current);
+        Assert.Equal(expectedCurrent, state.Current);
     }
 
     [Fact]

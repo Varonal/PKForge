@@ -1,7 +1,7 @@
 using Android.App;
 using Android.Content;
 using Android.Content.PM;
-using Android.Net;
+using AndroidUri = Android.Net.Uri;
 using PKForge.App.ViewModels;
 using PKForge.Domain;
 
