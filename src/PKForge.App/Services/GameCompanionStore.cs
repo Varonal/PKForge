@@ -13,9 +13,19 @@ public sealed partial class GameCompanionStore : ObservableObject, IGameCompanio
     // The generated property "Current" implements the interface's reader.
     [ObservableProperty] private GameCompanion? _current;
 
+    [ObservableProperty] private LiveCompanionSnapshot? _live;
+
     public void Start(GameCompanion companion) => Current = companion;
 
-    public void Stop() => Current = null;
+    public void UpdateLive(LiveCompanionSnapshot snapshot) => Live = snapshot;
+
+    public void ClearLive() => Live = null;
+
+    public void Stop()
+    {
+        Current = null;
+        Live = null;
+    }
 
     /// <summary>
     /// Starts the companion for a launched game: its dex progress and restore points

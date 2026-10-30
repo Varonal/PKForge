@@ -53,6 +53,12 @@ hors-ligne, sur la console elle-même.
 - [x] Onglet Émulateurs + liaison par console (style Cocoon)
 - [x] Bibliothèque de ROMs avec scan ES-DE et catalogue complet Gen 1-9
 - [x] Launcher Play (RetroArch, melonDS, Azahar, Eden + détection étendue)
+- [x] **GB/GBC/GBA joués nativement dans l'app** : cœur mGBA embarqué
+      (`libpkforge_mgba.so`, arm64), rendu SkiaSharp pixel-crisp à 59,7275 Hz,
+      audio 32768 Hz, sauvegardes `.sav` mappées — sans émulateur externe
+- [x] **Companion live (modèle PokéDaisy)** : pendant qu'un jeu GBA tourne dans
+      l'app, le second écran lit la mémoire de la console en direct — dex, équipe,
+      temps de jeu — rafraîchi chaque seconde
 - [x] Trophées maison par scan de sauvegardes + trophées manuels
 - [x] RetroAchievements (Gen 1-5) avec cache hors-ligne
 - [x] Watcher automatique + notifications de déblocage
@@ -60,13 +66,14 @@ hors-ligne, sur la console elle-même.
 - [x] Interface française par défaut (anglais disponible)
 
 ### 🚧 En cours
-- [ ] **Companion de jeu** : le second écran reste vivant pendant l'émulation —
-      stats, Pokédex, points de restauration pour les jeux mono-écran
+- [ ] **Companion de jeu externe** : le second écran reste vivant pendant l'émulation
+      externe (émulateurs tiers) — stats, Pokédex, points de restauration
 - [ ] **Intégration des mods** : Radical Red, Unbound, GS Chronicles… détectés et
       lancés depuis l'app avec leurs réglages dédiés
 - [ ] Traduction française complète des surfaces restantes (box browser, éditeurs)
 
-### 🔜 Planifié
+### 🔮 Planifié
+- [ ] Cœur DS embarqué (melonDS) pour les jeux DS natifs
 - [ ] Musée (grille Pokédex) sur l'écran secondaire
 - [ ] Watcher en arrière-plan (WorkManager) — scans sans l'app ouverte
 - [ ] Mises à jour in-app des définitions de trophées et du catalogue

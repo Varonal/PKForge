@@ -42,31 +42,34 @@ public sealed class TrophiesLadderView : VerticalStackLayout
         _rows.Children.Clear();
         foreach (var (title, glyph, unlocked, detail) in ladder.Rows)
         {
+            var glyphLabel = new Label
+            {
+                Text = glyph, FontSize = 13, WidthRequest = 20,
+                TextColor = unlocked ? UiTokens.Gold : UiTokens.Ink1, Opacity = unlocked ? 1.0 : 0.55,
+                VerticalOptions = LayoutOptions.Center,
+            };
+            var titleLabel = new Label
+            {
+                Text = title, FontFamily = DsChrome.PixelFont, FontSize = 12,
+                TextColor = unlocked ? UiTokens.Green : UiTokens.Ink1, LineBreakMode = LineBreakMode.TailTruncation,
+                VerticalOptions = LayoutOptions.Center,
+            };
+            var detailLabel = new Label
+            {
+                Text = detail, FontFamily = DsChrome.PixelFont, FontSize = 10,
+                TextColor = UiTokens.InkSoft, LineBreakMode = LineBreakMode.TailTruncation, MaxLines = 1,
+                HorizontalTextAlignment = TextAlignment.End, VerticalOptions = LayoutOptions.Center,
+            };
+            // The columns must be assigned: without them all three labels stack in
+            // column 0 (the one-column bug).
+            Grid.SetColumn(glyphLabel, 0);
+            Grid.SetColumn(titleLabel, 1);
+            Grid.SetColumn(detailLabel, 2);
             _rows.Children.Add(new Grid
             {
-                ColumnDefinitions = [new(GridLength.Auto), new(GridLength.Auto), new(GridLength.Star)],
+                ColumnDefinitions = [new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto)],
                 ColumnSpacing = 8,
-                Children =
-                {
-                    new Label
-                    {
-                        Text = glyph, FontSize = 13, WidthRequest = 20,
-                        TextColor = unlocked ? UiTokens.Gold : UiTokens.Ink1, Opacity = unlocked ? 1.0 : 0.55,
-                        VerticalOptions = LayoutOptions.Center,
-                    },
-                    new Label
-                    {
-                        Text = title, FontFamily = DsChrome.PixelFont, FontSize = 12,
-                        TextColor = unlocked ? UiTokens.Green : UiTokens.Ink1, LineBreakMode = LineBreakMode.TailTruncation,
-                        VerticalOptions = LayoutOptions.Center,
-                    },
-                    new Label
-                    {
-                        Text = detail, FontFamily = DsChrome.PixelFont, FontSize = 10,
-                        TextColor = UiTokens.InkSoft, LineBreakMode = LineBreakMode.TailTruncation, MaxLines = 1,
-                        HorizontalTextAlignment = TextAlignment.End, VerticalOptions = LayoutOptions.Center,
-                    },
-                },
+                Children = { glyphLabel, titleLabel, detailLabel },
             });
         }
         IsVisible = true;

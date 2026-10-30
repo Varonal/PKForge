@@ -22,6 +22,12 @@ public sealed class GameCompanionView : VerticalStackLayout
         FontFamily = DsChrome.PixelFont, FontSize = 13, TextColor = UiTokens.Cyan,
         HorizontalTextAlignment = TextAlignment.Center,
     };
+    private readonly Label _live = new()
+    {
+        FontFamily = DsChrome.PixelFont, FontSize = 11, TextColor = UiTokens.Green,
+        HorizontalTextAlignment = TextAlignment.Center,
+        IsVisible = false,
+    };
     private readonly VerticalStackLayout _points = new() { Spacing = 3 };
 
     public GameCompanionView()
@@ -33,6 +39,7 @@ public sealed class GameCompanionView : VerticalStackLayout
         VerticalOptions = LayoutOptions.Center;
         Children.Add(_title);
         Children.Add(_dex);
+        Children.Add(_live);
         Children.Add(new Label
         {
             Text = AppStrings.Fr ? "Points de restauration" : "Restore points",
@@ -50,6 +57,7 @@ public sealed class GameCompanionView : VerticalStackLayout
             ? $"Pokédex : {companion.DexCaught}/{companion.DexTotal} capturés · {companion.DexPercent}%"
             : $"Pokédex: {companion.DexCaught}/{companion.DexTotal} caught · {companion.DexPercent}%";
         _points.Children.Clear();
+        _live.IsVisible = false;
         if (companion.RestorePoints.Count == 0)
         {
             _points.Children.Add(new Label
@@ -70,5 +78,14 @@ public sealed class GameCompanionView : VerticalStackLayout
             }
         }
         IsVisible = true;
+    }
+
+    /// <summary>Overlays a live read from the running embedded game (PokéDaisy).</summary>
+    public void ShowLive(LiveCompanionSnapshot live)
+    {
+        _live.Text = AppStrings.Fr
+            ? $"En direct : dex {live.DexCaught}/{live.DexTotal} · équipe {live.PartyCount}/6 · {live.PlaytimeHours}h{live.PlaytimeMinutes:D2}"
+            : $"Live: dex {live.DexCaught}/{live.DexTotal} · party {live.PartyCount}/6 · {live.PlaytimeHours}h{live.PlaytimeMinutes:D2}";
+        _live.IsVisible = true;
     }
 }

@@ -90,10 +90,28 @@ public sealed class EmbeddedGamePage : ContentPage, IPadHandler, IPadReleaseHand
         _session.Draw(canvas, new SKRect(left, top, left + drawWidth, top + drawHeight));
     }
 
+    private Timer? _liveTimer;
+
     protected override void OnAppearing()
     {
         base.OnAppearing();
         IPlatformApplication.Current?.Services.GetService<GamepadRouter>()?.Push(this);
+        // PokéDaisy: while the game runs in-app, publish a live companion snapshot
+        // (dex/party/playtime read from the core's save RAM) every second.
+        var store = IPlatformApplication.Current?.Services.GetService<GameCompanionStore>();
+        if (store is not null)
+        {
+            store.Start(new Domain.GameCompanion(_session.GameTitle, 3, 0, 0, 0, []));
+            _liveTimer = new Timer(_ =>
+            {
+                var snapshot = _session.ReadLiveCompanion();
+                if (snapshot is null) return;
+                MainThread.BeginInvokeOnMainThread(() => store.UpdateLive(new Domain.LiveCompanionSnapshot(
+                    snapshot.GameTitle, snapshot.GameCode,
+                    snapshot.DexCaught, snapshot.DexSeen, snapshot.DexTotal,
+                    snapshot.PartyCount, snapshot.PlaytimeHours, snapshot.PlaytimeMinutes)));
+            }, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        }
     }
 
     protected override void OnDisappearing()
@@ -101,6 +119,9 @@ public sealed class EmbeddedGamePage : ContentPage, IPadHandler, IPadReleaseHand
         base.OnDisappearing();
         _session.FrameProduced -= Invalidate;
         IPlatformApplication.Current?.Services.GetService<GamepadRouter>()?.Remove(this);
+        _liveTimer?.Dispose();
+        _liveTimer = null;
+        IPlatformApplication.Current?.Services.GetService<GameCompanionStore>()?.ClearLive();
         _session.Dispose();
     }
 }

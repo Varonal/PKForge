@@ -1,3 +1,4 @@
+using PKForge.Domain;
 using SkiaSharp;
 
 namespace PKForge.App.Platforms.Android;
@@ -64,6 +65,23 @@ public sealed class EmbeddedGameSession : IDisposable
 
     /// <summary>Reads the live game memory — the companion's data bridge.</summary>
     public bool ReadBytes(uint address, Span<byte> destination) => _core.ReadBytes(address, destination);
+
+    /// <summary>
+    /// The live companion snapshot (dex, party, playtime) read from the running
+    /// core's save RAM. Null when the game isn't a Gen 3 GBA title or the memory
+    /// is unreadable. Gen 1/2 (GB/GBC) saves live elsewhere and are not read live.
+    /// </summary>
+    public LiveGbaCompanion.LiveCompanionSnapshot? ReadLiveCompanion()
+    {
+        var code = _core.GameCode;
+        if (!IsGen3Code(code)) return null;
+        return LiveGbaCompanion.Read(_core, MaxSpeciesGen3);
+    }
+
+    private static bool IsGen3Code(string code) => code is "BPRE" or "BPEE" or "BPEI" or "BPED"
+        or "BPSO" or "BPEO" or "AXVE" or "AXPE" or "AXVI" or "AXPI" or "AXVD" or "AXPD";
+
+    private const int MaxSpeciesGen3 = 386; // PKHeX Legal.MaxSpeciesID_3
 
     public void Dispose()
     {

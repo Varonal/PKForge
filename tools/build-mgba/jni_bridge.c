@@ -11,9 +11,10 @@
 
 #include <mgba/core/core.h>
 #include <mgba/core/blip_buf.h>
-#include <mgba-util/vfile.h>
+#include <mgba-util/vfs.h>
 #include <string.h>
 #include <stdlib.h>
+#include <fcntl.h>
 
 /* SAVESTATE_SCREENSHOT | SAVESTATE_SAVEDATA | SAVESTATE_RTC | SAVESTATE_METADATA */
 #define PKFORGE_STATE_FLAGS 0xF

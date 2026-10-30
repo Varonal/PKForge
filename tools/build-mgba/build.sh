@@ -51,7 +51,7 @@ fi
 "${CLANG}" \
   --target="${TRIPLE}${API}" \
   -shared -fPIC -O2 \
-  -I"${WORK}/mgba-${MGBA_VERSION}/include" -I"${WORK}/mgba-${MGBA_VERSION}/src" \
+  -I"${WORK}/mgba-${MGBA_VERSION}/include" \
   "${HERE}/jni_bridge.c" \
   "${WORK}/mgba-${MGBA_VERSION}/build-android/libmgba.a" \
   -o "${OUT}/libpkforge_mgba.so" \

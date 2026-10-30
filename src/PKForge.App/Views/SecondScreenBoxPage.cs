@@ -29,6 +29,7 @@ public sealed class SecondScreenBoxPage : ContentPage
     private readonly PokeparkJournalState? _journalState;
     private readonly PropertyChangedEventHandler? _secondScreenHandler;
     private readonly PropertyChangedEventHandler? _journalHandler;
+    private readonly PropertyChangedEventHandler? _companionHandler;
     private readonly MonSummaryView _inspector;
     private Func<Task>? _swapAsync;
     private bool _cleanedUp;
@@ -183,6 +184,7 @@ public sealed class SecondScreenBoxPage : ContentPage
             if (showHero) hero.SetGame(preview!);
             if (showTrophies) trophyLadder.Show(state!.TrophyLadder!);
             if (active is { } shownCompanion) companion.Show(shownCompanion);
+            if (companionStore?.Live is { } liveSnapshot) companion.ShowLive(liveSnapshot);
 
             journal.IsVisible = showJournal;
             dex.IsVisible = showDex;
@@ -241,6 +243,15 @@ public sealed class SecondScreenBoxPage : ContentPage
             };
             state.PropertyChanged += _secondScreenHandler;
         }
+        if (services?.GetService<Services.GameCompanionStore>() is { } companionStore)
+        {
+            _companionHandler = (_, args) =>
+            {
+                if (args.PropertyName is nameof(Services.GameCompanionStore.Live) or nameof(Services.GameCompanionStore.Current))
+                    QueueSwap();
+            };
+            companionStore.PropertyChanged += _companionHandler;
+        }
     }
 
     private static void LowerScreenFailed(string what, Exception error)
@@ -284,6 +295,8 @@ public sealed class SecondScreenBoxPage : ContentPage
             _secondScreenState.PropertyChanged -= _secondScreenHandler;
         if (_journalState is not null && _journalHandler is not null)
             _journalState.PropertyChanged -= _journalHandler;
+        if (_companionHandler is not null && IPlatformApplication.Current?.Services.GetService<Services.GameCompanionStore>() is { } store)
+            store.PropertyChanged -= _companionHandler;
         _journalView?.Detach();
         _swapAsync = null;
     }
