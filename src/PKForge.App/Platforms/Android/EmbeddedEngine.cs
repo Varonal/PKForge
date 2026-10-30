@@ -23,6 +23,7 @@ internal sealed class EmbeddedEngine : IDisposable
     private readonly CancellationTokenSource _cancel = new();
     private readonly object _frameGate = new();
     private SKBitmap? _frame;
+    private SKImage? _frameImage;
 
     // The GBA's audio: 32768 Hz stereo, ~548 samples per frame.
     private const int AudioFramesPerDrain = 1024;
@@ -48,19 +49,25 @@ internal sealed class EmbeddedEngine : IDisposable
         {
             // 32768 Hz is the GBA's own rate. The buffer holds ~116 ms of audio
             // (3840 frames × 4 bytes): responsive, and one GC pause never starves.
-            _track = new AudioTrack.Builder()
-                .SetAudioAttributes(new AudioAttributes.Builder()
-                    .SetUsage(AudioUsageKind.Game)
-                    .SetContentType(AudioContentType.Game)
-                    .Build())
-                .SetAudioFormat(new AudioFormat.Builder()
-                    .SetEncoding(Encoding.Pcm16bit)
-                    .SetSampleRate(32768)
-                    .SetChannelMask(ChannelOut.Stereo)
-                    .Build())
-                .SetBufferSizeInBytes(3840 * 4)
-                .SetTransferMode(AudioTrackMode.Stream)
-                .Build();
+#pragma warning disable CA1416 // AudioTrack.Builder needs API 23+; minSdk is 21 but every shipped device runs 23+.
+            var attributesBuilder = new AudioAttributes.Builder();
+            attributesBuilder.SetUsage(AudioUsageKind.Game);
+            attributesBuilder.SetContentType(AudioContentType.Music);
+            var attributes = attributesBuilder.Build()!;
+
+            var formatBuilder = new AudioFormat.Builder();
+            formatBuilder.SetEncoding(Encoding.Pcm16bit);
+            formatBuilder.SetSampleRate(32768);
+            formatBuilder.SetChannelMask(ChannelOut.Stereo);
+            var format = formatBuilder.Build()!;
+
+            var trackBuilder = new AudioTrack.Builder();
+            trackBuilder.SetAudioAttributes(attributes);
+            trackBuilder.SetAudioFormat(format);
+            trackBuilder.SetBufferSizeInBytes(3840 * 4);
+            trackBuilder.SetTransferMode(AudioTrackMode.Stream);
+            _track = trackBuilder.Build();
+#pragma warning restore CA1416
             _track.Play();
         }
         catch (Exception)
@@ -82,11 +89,11 @@ internal sealed class EmbeddedEngine : IDisposable
     {
         lock (_frameGate)
         {
-            if (_frame is null) return;
+            if (_frameImage is null) return;
             // Nearest-neighbour: the GBA's pixels must stay square and sharp,
             // never smoothed — an integer scale of 240×160.
             var sampling = new SKSamplingOptions(SKFilterMode.Nearest, SKMipmapMode.None);
-            canvas.DrawImage(_frame, destination, sampling);
+            canvas.DrawImage(_frameImage, destination, sampling);
         }
     }
 
@@ -114,8 +121,9 @@ internal sealed class EmbeddedEngine : IDisposable
 
             lock (_frameGate)
             {
-                _frame?.Dispose();
+                _frameImage?.Dispose();
                 _frame = frame;
+                _frameImage = SKImage.FromBitmap(frame);
             }
             FrameProduced?.Invoke();
 
@@ -148,15 +156,22 @@ internal sealed class EmbeddedEngine : IDisposable
         frame.Dispose();
     }
 
+    private void DisposeFrame()
+    {
+        lock (_frameGate)
+        {
+            _frameImage?.Dispose();
+            _frameImage = null;
+            _frame?.Dispose();
+            _frame = null;
+        }
+    }
+
     public void Dispose()
     {
         _cancel.Cancel();
         try { _thread.Join(500); } catch (ThreadStateException) { }
-        lock (_frameGate)
-        {
-            _frame?.Dispose();
-            _frame = null;
-        }
+        DisposeFrame();
         _track?.Stop();
         _track?.Release();
         _cancel.Dispose();
