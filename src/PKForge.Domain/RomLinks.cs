@@ -62,7 +62,7 @@ public static class RomLinkRules
     /// <summary>True when the emulator accepts a direct ROM handoff (otherwise it opens its library).</summary>
     public static bool CanLaunchRom(EmulatorKind kind) => EmulatorCatalog.App(kind).LaunchStyle != RomLaunchStyle.OpenAppOnly;
 
-    /// <summary>The subtitle the Emulators tab and the identity menu show for a link.</summary>
+    /// <summary>The link's subtitle, with a neutral emulator name the App can restyle.</summary>
     public static string Describe(RomLink link) =>
         $"{link.RomFileName} · {EmulatorCatalog.Name(link.Emulator)}";
 

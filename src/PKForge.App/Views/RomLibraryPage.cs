@@ -1,0 +1,413 @@
+using Microsoft.Maui.Controls.Shapes;
+using PKForge.App.Services;
+using PKForge.App.Theme;
+using PKForge.App.ViewModels;
+using PKForge.Domain;
+
+namespace PKForge.App.Views;
+
+/// <summary>
+/// The game library, PlayHub-style: one card per discovered Pokémon ROM with its
+/// artwork (cartridge mark as fallback), the generation · emulator subtitle, and a
+/// colored status line — green when a save was found, amber when the ROM is linked,
+/// muted otherwise. Tapping a playable row launches it in the console's bound
+/// emulator. The emulator chips above link in one tap through the standard save
+/// folders, never a folder picker.
+/// </summary>
+public sealed class RomLibraryPage : ContentPage, IPadHandler
+{
+    private readonly IRomScanner _scanner;
+    private readonly IRomLibraryStore _library;
+    private readonly IConsoleEmulatorStore _consoleEmulators;
+    private readonly IEmulatorLauncher _launcher;
+    private readonly DirectSaveScanner? _saveScanner;
+    private VerticalStackLayout _rows = null!;
+    private Grid _hostGrid = null!;
+    private Label _readout = null!;
+    private Label _countLabel = null!;
+
+    public RomLibraryPage(IRomScanner scanner, IRomLibraryStore library, IConsoleEmulatorStore consoleEmulators, IEmulatorLauncher launcher, ISaveEngine? engine = null)
+    {
+        _scanner = scanner;
+        _library = library;
+        _consoleEmulators = consoleEmulators;
+        _launcher = launcher;
+        _saveScanner = engine is not null ? new DirectSaveScanner(engine) : null;
+        Title = AppStrings.LibraryTitle;
+        BackgroundColor = UiTokens.Housing;
+        NavigationPage.SetHasNavigationBar(this, false);
+
+        var back = Kit.MiniCapsule(AppStrings.Back, UiTokens.Ink0);
+        back.WidthRequest = 72;
+        back.Clicked += async (_, _) => await Navigation.PopAsync();
+
+        var header = Kit.HeaderBar(AppStrings.LibraryTitle);
+        header.VerticalOptions = LayoutOptions.Center;
+
+        _countLabel = new Label
+        {
+            FontFamily = DsChrome.PixelFont,
+            FontSize = UiTokens.TextLabel,
+            TextColor = UiTokens.Ink1,
+            VerticalOptions = LayoutOptions.Center,
+        };
+
+        var scan = Kit.Capsule(AppStrings.ScanRoms, UiTokens.Cyan);
+        scan.Clicked += (_, _) => _ = ScanAsync();
+
+        var titleRow = new Grid
+        {
+            ColumnSpacing = 10,
+            ColumnDefinitions = [new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto), new(GridLength.Auto)],
+            Children = { back, header, _countLabel, scan },
+        };
+        Grid.SetColumn(header, 1);
+        Grid.SetColumn(_countLabel, 2);
+        Grid.SetColumn(scan, 3);
+
+        _readout = new Label
+        {
+            TextColor = UiTokens.InkSoft,
+            FontFamily = DsChrome.PixelFont,
+            FontSize = UiTokens.TextBody,
+            LineBreakMode = LineBreakMode.WordWrap,
+        };
+
+        _rows = new VerticalStackLayout { Spacing = 6 };
+        var scrollable = new ScrollView
+        {
+            Orientation = ScrollOrientation.Vertical,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Never,
+            Content = _rows,
+        };
+
+        var body = new Grid
+        {
+            RowSpacing = 10,
+            RowDefinitions = [new(GridLength.Auto), new(GridLength.Star)],
+            Children = { Kit.Well(_readout, padding: 8), scrollable },
+        };
+        Grid.SetRow(scrollable, 1);
+
+        var panel = Kit.DevicePanel(body);
+        var root = new Grid
+        {
+            Padding = new Thickness(14, 10),
+            RowSpacing = 10,
+            RowDefinitions = [new(GridLength.Auto), new(GridLength.Star)],
+            Children = { titleRow, panel },
+        };
+        Grid.SetRow(panel, 1);
+        _hostGrid = new Grid { Children = { DsChrome.GridBackground(), root } };
+        Content = _hostGrid;
+    }
+
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+        Rebuild(_library.GetAll());
+        IPlatformApplication.Current?.Services.GetService<GamepadRouter>()?.Push(this);
+    }
+
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        IPlatformApplication.Current?.Services.GetService<GamepadRouter>()?.Remove(this);
+    }
+
+    private void Rebuild(IReadOnlyList<LibraryRom> roms)
+    {
+        _rows.Children.Clear();
+        // The whole catalog shows: owned games first (with their ROM), the rest after,
+        // each with a colored owned/missing label.
+        var byName = roms.GroupBy(r => r.GameName, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+        // Catalog order (Gen 1 → 9, release order within a generation): owned games
+        // show their ROM, the rest show the colored missing label.
+        var ordered = TrophyCatalog.Games
+            .Select(game => (Game: game, Rom: byName.GetValueOrDefault(Normalise(game.Label))))
+            .ToList();
+        foreach (var (game, rom) in ordered)
+            _rows.Children.Add(rom is not null ? BuildRomCard(rom) : BuildMissingCard(game.Label, game.Generation));
+        _countLabel.Text = AppStrings.RomCount(roms.Count);
+        _readout.Text = roms.Count > 0
+            ? AppStrings.RomCount(roms.Count)
+            : _scanner.RomRoot is null ? AppStrings.NoRomRoot : AppStrings.Fr
+                ? "Appuyez sur Scanner pour chercher vos ROMs dans /storage/emulated/0/ROMs."
+                : "Tap Scan to look for your ROMs in /storage/emulated/0/ROMs.";
+    }
+
+    private static string Normalise(string label) =>
+        label.Replace("Pokémon ", "", StringComparison.OrdinalIgnoreCase)
+             .Replace("Pokemon ", "", StringComparison.OrdinalIgnoreCase)
+             .Replace(" Version", "", StringComparison.OrdinalIgnoreCase).Trim();
+
+    /// <summary>A catalog game the player has no ROM of: muted card, missing label.</summary>
+    private View BuildMissingCard(string label, int generation)
+    {
+        // The artwork loads for missing games too: the catalog always shows its face.
+        var art = new Image
+        {
+            Aspect = Aspect.AspectFit,
+            WidthRequest = 44,
+            HeightRequest = 44,
+            IsVisible = false,
+        };
+        var mark = new GameCartridgeMark { WidthRequest = 40, HeightRequest = 40, Generation = generation };
+        _ = LoadArtAsync(art, mark, Normalise(label));
+        var title = new Label
+        {
+            Text = Normalise(label),
+            FontFamily = DsChrome.PixelFont,
+            FontSize = 16,
+            TextColor = UiTokens.Ink1,
+            VerticalTextAlignment = TextAlignment.Center,
+        };
+        var subtitle = new Label
+        {
+            Text = $"Gen {generation}",
+            FontFamily = DsChrome.PixelFont,
+            FontSize = UiTokens.TextLabel,
+            TextColor = UiTokens.InkSoft,
+            VerticalTextAlignment = TextAlignment.Center,
+        };
+        var missing = new Label
+        {
+            Text = AppStrings.Fr ? "Pas de ROM" : "No ROM",
+            FontFamily = DsChrome.PixelFont,
+            FontSize = UiTokens.TextLabel,
+            TextColor = UiTokens.Ink1,
+            VerticalTextAlignment = TextAlignment.Center,
+            HorizontalOptions = LayoutOptions.End,
+        };
+        var text = new VerticalStackLayout { Spacing = 2, VerticalOptions = LayoutOptions.Center, Children = { title, subtitle } };
+        var card = new Border
+        {
+            BackgroundColor = UiTokens.Housing,
+            Stroke = UiTokens.ShellEdge,
+            StrokeThickness = 1,
+            Opacity = 0.6,
+            StrokeShape = new RoundRectangle { CornerRadius = UiTokens.ControlRadius },
+            Padding = new Thickness(10, 8),
+            Content = new Grid
+            {
+                ColumnDefinitions = [new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto)],
+                ColumnSpacing = 12,
+                Children = { new Grid { Children = { mark, art } }, text, missing },
+            },
+        };
+        Grid.SetColumn(text, 1);
+        Grid.SetColumn(missing, 2);
+        return card;
+    }
+
+    /// <summary>One game card: artwork (cartridge mark as fallback), title, generation·
+    /// emulator subtitle, and the colored status line.</summary>
+    private View BuildRomCard(LibraryRom rom)
+    {
+        // The artwork loads asynchronously at build time: the cartridge mark shows
+        // until the icon is ready, then takes its place (PlayHub's pattern).
+        var art = new Image
+        {
+            Aspect = Aspect.AspectFit,
+            WidthRequest = 44,
+            HeightRequest = 44,
+            IsVisible = false,
+        };
+        var mark = new GameCartridgeMark { WidthRequest = 40, HeightRequest = 40, Generation = rom.Generation };
+        _ = LoadArtAsync(art, mark, rom.GameName);
+
+        var title = new Label
+        {
+            FontFamily = DsChrome.PixelFont,
+            FontSize = 16,
+            TextColor = UiTokens.Ink0,
+            VerticalTextAlignment = TextAlignment.Center,
+        };
+        title.SetBinding(Label.TextProperty, "GameName");
+
+        var subtitle = new Label
+        {
+            FontFamily = DsChrome.PixelFont,
+            FontSize = UiTokens.TextLabel,
+            TextColor = UiTokens.Ink1,
+            VerticalTextAlignment = TextAlignment.Center,
+        };
+        subtitle.SetBinding(Label.TextProperty, new Binding("Console", converter: ConsoleNameConverter.Instance));
+
+        var status = new Label
+        {
+            FontFamily = DsChrome.PixelFont,
+            FontSize = UiTokens.TextLabel,
+            VerticalTextAlignment = TextAlignment.Center,
+            HorizontalOptions = LayoutOptions.End,
+            TextColor = UiTokens.Cyan,
+        };
+        status.SetBinding(Label.TextProperty, new Binding("FileName", converter: FileNameTruncateConverter.Instance));
+
+        var text = new VerticalStackLayout
+        {
+            Spacing = 2,
+            VerticalOptions = LayoutOptions.Center,
+            Children = { title, subtitle },
+        };
+
+        var row = new Border
+        {
+            BackgroundColor = UiTokens.Paper,
+            Stroke = UiTokens.ShellEdge,
+            StrokeThickness = 1,
+            StrokeShape = new RoundRectangle { CornerRadius = UiTokens.ControlRadius },
+            Padding = new Thickness(10, 8),
+            Content = new Grid
+            {
+                ColumnDefinitions = [new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto)],
+                ColumnSpacing = 12,
+                Children = { new Grid { Children = { mark, art } }, text, status },
+            },
+        };
+        Grid.SetColumn(text, 1);
+        Grid.SetColumn(status, 2);
+
+        // Every binding in the card reads from the row's own context.
+        row.BindingContext = rom;
+        var tap = new TapGestureRecognizer();
+        tap.Tapped += (_, _) => _ = LaunchAsync(rom);
+        row.GestureRecognizers.Add(tap);
+        return row;
+    }
+
+    /// <summary>Loads the game's artwork; the cartridge mark stays until it lands.</summary>
+    private static async Task LoadArtAsync(Image art, GameCartridgeMark mark, string gameName)
+    {
+        var path = await GameArt.GetIconAsync($"Pokémon {gameName}");
+        if (path is null) return;
+        art.Source = path;
+        art.IsVisible = true;
+        mark.IsVisible = false;
+    }
+
+    /// <summary>A tap launches: the console's bound emulator, and the ROM's plain path.</summary>
+    private async Task LaunchAsync(LibraryRom rom)
+    {
+        var bound = _consoleEmulators.Find(rom.Console);
+        var fallback = ConsoleRules.EmulatorsFor(rom.Console)
+            .FirstOrDefault(kind => EmulatorCatalog.IsInstalled(kind, _launcher.IsInstalled));
+        if (bound is null && fallback == default)
+        {
+            await PadMenu.ShowAsync(_hostGrid, AppStrings.RomMissing,
+                $"{rom.GameName}: {AppStrings.NotInstalled}.", AppStrings.Ok);
+            return;
+        }
+        var kind = bound ?? fallback;
+        // GB/GBC/GBA play embedded when the core is packed (option A): the game
+        // runs in-process, its memory readable live by the companion. Anything
+        // else (or no library) keeps the external emulator path.
+        if (rom.Console is GameConsole.GameBoy or GameConsole.GameBoyColor or GameConsole.GameBoyAdvance)
+        {
+            var save = FindSaveFor(rom.FilePath);
+            var session = await Task.Run(() => Platforms.Android.EmbeddedGameSession.TryStart(rom.FilePath, save));
+            if (session is not null)
+            {
+                await MainThread.InvokeOnMainThreadAsync(() => Navigation.PushAsync(new EmbeddedGamePage(session)));
+                return;
+            }
+        }
+        var link = new RomLink("library", rom.FilePath, rom.FileName, kind,
+            RomNameRules.GenerationOf(rom.GameName), $"Pokémon {rom.GameName}");
+        if (await _launcher.LaunchAsync(link))
+        {
+            // The game runs: the lower screen becomes its companion until the
+            // player comes back.
+            await (IPlatformApplication.Current?.Services.GetService<Services.GameCompanionStore>()?.StartForGameAsync(link) ?? Task.CompletedTask);
+            return;
+        }
+        await PadMenu.ShowAsync(_hostGrid, AppStrings.RomMissing,
+            $"{SaveDescriptions.EmulatorName(kind)}: {rom.FileName}", AppStrings.Ok);
+    }
+
+    /// <summary>The save file mGBA's convention names for a ROM, when it exists.</summary>
+    private static string? FindSaveFor(string romPath)
+    {
+        try
+        {
+            var save = System.IO.Path.ChangeExtension(romPath, ".sav");
+            return File.Exists(save) ? save : null;
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>One pass over every console's ES-DE folder; the library is replaced wholesale.</summary>
+    private async Task ScanAsync()
+    {
+        _readout.Text = AppStrings.Scanning;
+        try
+        {
+            var roms = await Task.Run(() =>
+            {
+                var found = new List<LibraryRom>();
+                foreach (var console in Enum.GetValues<GameConsole>())
+                    found.AddRange(_scanner.Scan(console));
+                return found;
+            }).ConfigureAwait(true);
+            _library.ReplaceAll(roms);
+            Rebuild(roms);
+        }
+        catch (Exception error)
+        {
+            _readout.Text = error.Message;
+        }
+    }
+
+    public bool OnPadButton(PadButton button)
+    {
+        switch (button)
+        {
+            case PadButton.A: _ = ScanAsync(); return true;
+            case PadButton.B: _ = Navigation.PopAsync(); return true;
+            default: return true; // own the pad while this page is up
+        }
+    }
+}
+
+/// <summary>Console enum → display name.</summary>
+public sealed class ConsoleNameConverter : IValueConverter
+{
+    public static readonly ConsoleNameConverter Instance = new();
+
+    public object Convert(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture) =>
+        value is GameConsole console ? ConsoleLabel(console) : string.Empty;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture) =>
+        throw new NotSupportedException();
+
+    public static string ConsoleLabel(GameConsole console) => console switch
+    {
+        GameConsole.GameBoy => "Game Boy",
+        GameConsole.GameBoyColor => "Game Boy Color",
+        GameConsole.GameBoyAdvance => "Game Boy Advance",
+        GameConsole.NintendoDs => "Nintendo DS",
+        GameConsole.Nintendo3Ds => "Nintendo 3DS",
+        GameConsole.GameCube => "GameCube",
+        GameConsole.NintendoSwitch => "Switch",
+        _ => console.ToString(),
+    };
+}
+
+/// <summary>File names get one truncated line.</summary>
+public sealed class FileNameTruncateConverter : IValueConverter
+{
+    public static readonly FileNameTruncateConverter Instance = new();
+
+    public object Convert(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture)
+    {
+        if (value is not string name) return string.Empty;
+        return name.Length > 28 ? name[..25] + "…" : name;
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture) =>
+        throw new NotSupportedException();
+}

@@ -154,7 +154,7 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
                 _canvas.InvalidateSurface();
                 _boxBar.InvalidateSurface();
             }
-            // The footer's labels follow the selection ("Select box" / "Unmark box", the count).
+            // The footer's labels follow the selection (AppStrings.Fr ? "Sélectionner la boîte" : "Select box" / "Unmark box", the count).
             if (args.PropertyName is nameof(BoxBrowserViewModel.MarkedCount) or nameof(BoxBrowserViewModel.SelectMode)
                 or nameof(BoxBrowserViewModel.BoxIndex) or nameof(BoxBrowserViewModel.VisibleSlots))
             {
@@ -270,13 +270,13 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
         ("A", _viewModel.CarrySource is null ? "Grab" : "Place", null),
         ("-", "Multi-select", EnterSelectMode),
         ("LR", "Box", () => OnPadButton(PadButton.R)),
-        ("X", "Tools", () => _ = ShowToolsAsync()), ("Y", "Save data", () => _ = ShowSaveDataAsync()),
+        ("X", AppStrings.Fr ? "Outils" : "Tools", () => _ = ShowToolsAsync()), ("Y", "Save data", () => _ = ShowSaveDataAsync()),
         ("+", "Menu", () => OpenCursorMenu()),
         ("B", _viewModel.CarrySource is null ? "Back" : "Cancel", () => OnPadButton(PadButton.B)));
 
     private void SetSelectFooter() => _footerHost.Content = DsChrome.Footer(
         ("A", "Mark · hold for area", () => { OnPadButton(PadButton.A); OnPadReleased(PadButton.A); }),
-        ("Y", _viewModel.CurrentBoxFullyMarked ? "Unmark box" : "Select box", () => OnPadButton(PadButton.Y)),
+        ("Y", _viewModel.CurrentBoxFullyMarked ? (AppStrings.Fr ? "Dé-marquer la boîte" : "Unmark box") : (AppStrings.Fr ? "Sélectionner la boîte" : "Select box"), () => OnPadButton(PadButton.Y)),
         ("X", $"Actions ({_viewModel.MarkedCount})", () => _ = ShowOrganizerMenuAsync()),
         ("+", "Boxes", EnterBoxManageMode),
         ("LR", "Box", () => OnPadButton(PadButton.R)),
@@ -636,11 +636,11 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
         var options = new List<PadOption>
         {
             new("Multi-select (- button)", IconPath: "select", Detail: "Mark several Pokémon to move, copy or edit them together."),
-            new("Box manager…", IconPath: "box", Detail: "Reorder, copy, lock or empty whole boxes."),
+            new(AppStrings.Fr ? "Gestion des boîtes…" : "Box manager…", IconPath: "box", Detail: AppStrings.Fr ? "Réorganiser, copier, verrouiller ou vider des boîtes entières." : "Reorder, copy, lock or empty whole boxes."),
         };
         options.AddRange(Menu(
             Allowed(SaveAction.CreateMon, new("Import .pk files", IconPath: "import", Detail: "Pick Pokémon files to fill this box's empty slots.")),
-            Allowed(SaveAction.CreateMon, new("Import Showdown team", IconPath: "script", Detail: "Paste Showdown sets, see their legality, then place them in empty slots.")),
+            Allowed(SaveAction.CreateMon, new(AppStrings.Fr ? "Importer une équipe Showdown" : "Import Showdown team", IconPath: "script", Detail: "Paste Showdown sets, see their legality, then place them in empty slots.")),
             new("Export box to Showdown", IconPath: "script", Detail: "This box as Showdown text to copy or share."),
             Allowed(SaveAction.CreateMon, new("Generate Living Dex", IconPath: "create", Detail: "Replaces every box with one legal Pokémon of each species.")),
             new("How to get a Pokémon…", IconPath: "map", Detail: "How to obtain a species in the game you are editing."),
@@ -653,20 +653,20 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
         if (boxTools)
         {
             options.AddRange(Menu(
-                Allowed(SaveAction.BatchEdit, new("Battle prep", IconPath: "battle", Detail: "Heal, max PP or set levels for the party or every box.")),
+                Allowed(SaveAction.BatchEdit, new(AppStrings.Fr ? "Préparation de combat" : "Battle prep", IconPath: "battle", Detail: "Heal, max PP or set levels for the party or every box.")),
                 Allowed(SaveAction.BatchEdit, new("Batch editor", IconPath: "batch", Detail: "Change level, IVs, EVs, healing and more on many Pokémon at once.")),
                 Allowed(SaveAction.BatchEdit, new("Batch rename / OT…", IconPath: "rename", Detail: "Reset nicknames, or make you the original trainer, on many Pokémon.")),
                 Allowed(SaveAction.CreateMon, new("Random team…", IconPath: "dice", Detail: "Roll a random legal team into the party or empty box slots."))));
         }
         options.AddRange(Menu(
             Allowed(SaveAction.BatchEdit, new("Presets…", IconPath: "preset", Detail: "One change, like Level 100 or perfect IVs, on a box or all boxes.")),
-            new("Trainer profiles…", IconPath: "profile", Detail: "Save trainer details and give them to Pokémon as their original trainer."),
+            new(AppStrings.Fr ? "Profils de dresseur…" : "Trainer profiles…", IconPath: "profile", Detail: "Save trainer details and give them to Pokémon as their original trainer."),
             new("Legality check", IconPath: "check", Detail: "Check every Pokémon in the save and repair the illegal ones."),
             new("Audit report", IconPath: "report", Detail: "Find cloned Pokémon and impossible values across the save."),
             new("Nuzlocke report", IconPath: "skull", Detail: "The first catch on each route, from where each Pokémon was met."),
             new("Collection dex…", IconPath: "pokedex", Detail: "Living dex tracker for the Bank and this save, normal and shiny.")));
         if (boxTools)
-            options.Add(new("Sort boxes…", IconPath: "sort", Detail: "Order this box or all boxes by dex number, level, type and more."));
+            options.Add(new(AppStrings.Fr ? "Trier les boîtes…" : "Sort boxes…", IconPath: "sort", Detail: "Order this box or all boxes by dex number, level, type and more."));
         var choice = await PadMenu.ShowAsync(_hostGrid, "Storage tools", Note(null), options.ToArray());
         switch (choice)
         {
@@ -676,7 +676,7 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
             case "Import .pk files":
                 await BulkImportAsync();
                 return;
-            case "Import Showdown team":
+            case var c when c == (AppStrings.Fr ? "Importer une équipe Showdown" : "Import Showdown team"):
                 await ImportShowdownTeamAsync();
                 return;
             case "Export box to Showdown":
@@ -700,7 +700,7 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
             case "IV ranking…":
                 await ShowIvRankingAsync();
                 return;
-            case "Battle prep":
+            case var c when c == (AppStrings.Fr ? "Préparation de combat" : "Battle prep"):
                 await ShowBattlePrepAsync();
                 return;
             case "Egg factory…":
@@ -732,7 +732,7 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
             case "Presets…":
                 await ShowPresetsMenuAsync();
                 return;
-            case "Trainer profiles…":
+            case var c when c == (AppStrings.Fr ? "Profils de dresseur…" : "Trainer profiles…"):
                 await ShowTrainerProfilesAsync();
                 return;
             case "Legality check":
@@ -744,10 +744,10 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
             case "Nuzlocke report":
                 await ShowNuzlockeReportAsync();
                 return;
-            case "Box manager…":
+            case var c when c == (AppStrings.Fr ? "Gestion des boîtes…" : "Box manager…"):
                 EnterBoxManageMode();
                 return;
-            case "Sort boxes…":
+            case var c when c == (AppStrings.Fr ? "Trier les boîtes…" : "Sort boxes…"):
                 await ShowSortMenuAsync();
                 return;
             case "Collection dex…":
@@ -882,7 +882,7 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
         if (_boxHeld || _boxManageBusy) return;
         var selected = _markedBoxes.Count == 0 ? new[] { _viewModel.BoxIndex } : _markedBoxes.OrderBy(x => x).ToArray();
         var noun = selected.Length == 1 ? $"box {selected[0] + 1:00}" : $"{selected.Length} selected boxes";
-        var emptyLabel = _markedBoxes.Count > 0 ? "Empty selected boxes" : "Empty all boxes";
+        var emptyLabel = _markedBoxes.Count > 0 ? AppStrings.Fr ? "Vider les boîtes sélectionnées" : "Empty selected boxes" : "Empty all boxes";
         var choice = await PadMenu.ShowAsync(_hostGrid, $"Box actions · {noun}",
             Note("No selection means the current box. Every write creates a restore point."),
             Menu(
@@ -890,7 +890,7 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
                 new PadOption("Mark all boxes", IconPath: "selectall", Detail: "Select every box for the actions in this menu."),
                 new PadOption("Lock / Unlock box(es)", IconPath: "padlock", Detail: "Locked boxes are skipped by sorting, batch edits and emptying."),
                 Allowed(SaveAction.Duplicate, new("Copy box(es)…", IconPath: "copy", Detail: "Copy these boxes over other boxes, replacing what is there.")),
-                new PadOption("Delete box(es) (rescue Pokémon)", IconPath: "delete", Detail: "Removes the boxes; their Pokémon move to free slots first."),
+                new PadOption(AppStrings.Fr ? "Supprimer la/des boîte(s) (Pokémon secourus)" : "Delete box(es) (rescue Pokémon)", IconPath: "delete", Detail: "Removes the boxes; their Pokémon move to free slots first."),
                 new PadOption(emptyLabel, IconPath: "clear", Detail: "Releases every Pokémon in the boxes. The party is not touched."),
                 new PadOption("Clear box marks", IconPath: "deselect"),
                 // Name/wallpaper act on the box under the cursor (PKHeX SAV_BoxLayout edits one box at a time).
@@ -945,12 +945,14 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
             return;
         }
         var lockedTargets = selected.Where(box => DocumentId is not null && Protection.IsBoxLocked(DocumentId!, box)).ToList();
-        if ((choice == "Empty selected boxes" || choice == "Delete box(es) (rescue Pokémon)") && lockedTargets.Count > 0)
+        if ((choice == (AppStrings.Fr ? "Vider les boîtes sélectionnées" : "Empty selected boxes")
+                || choice == (AppStrings.Fr ? "Supprimer la/des boîte(s) (Pokémon secourus)" : "Delete box(es) (rescue Pokémon)"))
+            && lockedTargets.Count > 0)
         {
             _viewModel.Status = $"{lockedTargets.Count} target box(ES) are locked";
             return;
         }
-        if (choice == emptyLabel && choice == "Empty selected boxes")
+        if (choice == emptyLabel && choice == (AppStrings.Fr ? "Vider les boîtes sélectionnées" : "Empty selected boxes"))
         {
             var confirmed = await PadMenu.ConfirmAsync(_hostGrid, "Empty selected boxes?",
                 $"Release every Pokémon in {selected.Length} box(es). A restore point is created first.", "Empty");
@@ -1002,7 +1004,7 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
                 return new GenerationOutcome(true, $"Copied {copies.Length} box(es) starting at box {start + 1:00}.");
             }, Math.Max(0, _viewModel.SelectedSlot), refreshSlot: false, action: SaveAction.Duplicate);
         }
-        else if (choice == "Delete box(es) (rescue Pokémon)")
+        else if (choice == (AppStrings.Fr ? "Supprimer la/des boîte(s) (Pokémon secourus)" : "Delete box(es) (rescue Pokémon)"))
         {
             var rescueNote = selected.Length >= _viewModel.BoxCount
                 ? "Every box is selected: rescued Pokémon have nowhere to go, so they are released."
@@ -1171,7 +1173,7 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
         var options = new List<PadOption>
         {
             new(_viewModel.CurrentBoxFullyMarked ? $"Unmark {page}" : $"Select all in {page}", IconPath: "selectall"),
-            new("Select all boxes", IconPath: "all"),
+            new(AppStrings.Fr ? "Tout sélectionner" : "Select all boxes", IconPath: "all"),
             new($"Invert {page}", IconPath: "invert", Detail: "Swap marked and unmarked Pokémon here."),
         };
         if (count > 0)
@@ -1180,16 +1182,16 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
             options.AddRange(Menu(
                 new PadOption("Move to box…", IconPath: "move"),
                 new PadOption("Move to Bank", IconPath: "bank", Detail: "They leave this save and are stored in the Bank."),
-                Allowed(SaveAction.Duplicate, new("Copy to Bank", IconPath: "bank", Detail: "Copies go to the Bank; the originals stay here.")),
+                Allowed(SaveAction.Duplicate, new(AppStrings.CopyToBank, IconPath: "bank", Detail: AppStrings.Fr ? "Les copies vont dans la Banque ; les originaux restent ici." : "Copies go to the Bank; the originals stay here.")),
                 new PadOption("Move to another game…", IconPath: "send", Detail: "They leave this save and join another linked game."),
                 Allowed(SaveAction.Duplicate, new("Copy to another game…", IconPath: "copy", Detail: "Copies join another linked game; the originals stay here.")),
-                Allowed(SaveAction.Duplicate, new("Duplicate", IconPath: "copy", Detail: "Clone the marked Pokémon into the first free box slots.")),
+                Allowed(SaveAction.Duplicate, new(AppStrings.Fr ? "Dupliquer" : "Duplicate", IconPath: "copy", Detail: "Clone the marked Pokémon into the first free box slots.")),
                 new PadOption("Export (.pk files)", IconPath: "export", Detail: "Share each marked Pokémon as its own file."),
-                new PadOption("Release", IconPath: "release")));
+                new PadOption(AppStrings.Release, IconPath: "release")));
             options.AddRange(BulkOptions());
         }
         options.Add(new("Mark Pokémon holding…", IconPath: "item", Detail: "Find Pokémon holding an item, then mark them or go to one."));
-        options.Add(new("Box manager…", IconPath: "box", Detail: "Reorder, copy, lock or empty whole boxes."));
+        options.Add(new(AppStrings.Fr ? "Gestion des boîtes…" : "Box manager…", IconPath: "box", Detail: AppStrings.Fr ? "Réorganiser, copier, verrouiller ou vider des boîtes entières." : "Reorder, copy, lock or empty whole boxes."));
         options.Add(new("Back to move mode", IconPath: "confirm", Detail: "Leave multi-select."));
 
         var choice = await PadMenu.ShowAsync(_hostGrid, $"Multi-select · {count} marked",
@@ -1205,7 +1207,7 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
             case "Select all in this box" or "Select all in the party" or "Unmark this box" or "Unmark the party":
                 _viewModel.ToggleBoxMarks();
                 break;
-            case "Select all boxes":
+            case var c when c == (AppStrings.Fr ? "Tout sélectionner" : "Select all boxes"):
                 _viewModel.MarkAllBoxes();
                 break;
             case "Invert this box" or "Invert the party":
@@ -1231,16 +1233,16 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
             case "Move to another game…":
                 await SendSelectionToGameAsync(copy: false);
                 break;
-            case "Copy to another game…":
+            case var c when c == AppStrings.CopyToAnotherGame:
                 await SendSelectionToGameAsync(copy: true);
                 break;
-            case "Duplicate":
+            case var c when c == (AppStrings.Fr ? "Dupliquer" : "Duplicate"):
                 await DuplicateSelectionAsync();
                 break;
             case "Move to Bank":
                 await SendSelectionToBankAsync(copy: false);
                 break;
-            case "Copy to Bank":
+            case var c when c == AppStrings.CopyToBank:
                 await SendSelectionToBankAsync(copy: true);
                 break;
             case "Export (.pk files)":
@@ -1257,10 +1259,10 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
                 _viewModel.Status = $"Exported {paths.Count} Pokémon.";
                 break;
             }
-            case "Release":
+            case var c when c == AppStrings.Release:
                 await ReleaseSelectionAsync();
                 break;
-            case "Box manager…":
+            case var c when c == (AppStrings.Fr ? "Gestion des boîtes…" : "Box manager…"):
                 EnterBoxManageMode();
                 return;
             case "Back to move mode":
@@ -1471,7 +1473,7 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
     }
 
     /// <summary>Paste a full Showdown team: every set is previewed with its legality, then placed into chosen empty slots.</summary>
-    private Task ImportShowdownTeamAsync() => ImportShowdownPreviewedAsync("Import Showdown team");
+    private Task ImportShowdownTeamAsync() => ImportShowdownPreviewedAsync(AppStrings.Fr ? "Importer une équipe Showdown" : "Import Showdown team");
 
     /// <summary>Every mon in the current box as one Showdown text: copy or share.</summary>
     private async Task ExportBoxShowdownAsync()
@@ -1483,14 +1485,14 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
             .Select(s => session.GetShowdownText(_viewModel.BoxIndex, s.Slot));
         var text = string.Join("\n\n", sets);
         if (text.Length == 0) { _viewModel.Status = "This box is empty."; return; }
-        var choice = await PadMenu.ShowAsync(_hostGrid, "Box as Showdown team", null, "Copy to clipboard", "Share as file", "Close");
+        var choice = await PadMenu.ShowAsync(_hostGrid, "Box as Showdown team", null, "Copy to clipboard", AppStrings.Fr ? "Partager en fichier" : "Share as file", "Close");
         switch (choice)
         {
             case "Copy to clipboard":
                 await Clipboard.Default.SetTextAsync(text);
                 _viewModel.Status = "Box copied as Showdown text.";
                 return;
-            case "Share as file":
+            case var c when c == (AppStrings.Fr ? "Partager en fichier" : "Share as file"):
                 var path = System.IO.Path.Combine(FileSystem.CacheDirectory, $"box-{_viewModel.BoxIndex + 1}.txt");
                 await File.WriteAllTextAsync(path, text);
                 await Share.Default.RequestAsync(new ShareFileRequest { Title = "Showdown team", File = new ShareFile(path) });
@@ -1546,21 +1548,21 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
     /// <summary>Auto-sort: pick a criteria, pick a scope, one backed-up write compacts mons front.</summary>
     private async Task ShowSortMenuAsync()
     {
-        var choice = await PadMenu.ShowAsync(_hostGrid, "Sort", "How should the boxes be ordered?",
+        var choice = await PadMenu.ShowAsync(_hostGrid, AppStrings.Fr ? "Trier" : "Sort", AppStrings.Fr ? "Quel ordre pour les boîtes ?" : "How should the boxes be ordered?",
             new PadOption("Dex number", IconPath: "pokedex"),
             new PadOption("Alphabetical", IconPath: "alpha"),
             new PadOption("Level (strongest first)", IconPath: "level"),
             new PadOption("IV total (best first)", IconPath: "stats"),
             new PadOption("Type", IconPath: "type"),
             new PadOption("Age (oldest first)", IconPath: "calendar"),
-            new PadOption("Shiny first", IconPath: "shiny"));
+            new PadOption(AppStrings.Fr ? "Chromatiques d'abord" : "Shiny first", IconPath: "shiny"));
         if (choice is null) return;
 
-        var scope = await PadMenu.ShowAsync(_hostGrid, "Sort", "Which boxes?",
+        var scope = await PadMenu.ShowAsync(_hostGrid, AppStrings.Fr ? "Trier" : "Sort", AppStrings.Fr ? "Quelles boîtes ?" : "Which boxes?",
             new PadOption("This box", IconPath: "box"),
             new PadOption("All boxes", IconPath: "storage"));
 
-        var direction = await PadMenu.ShowAsync(_hostGrid, "Sort", "Which direction?",
+        var direction = await PadMenu.ShowAsync(_hostGrid, AppStrings.Fr ? "Trier" : "Sort", AppStrings.Fr ? "Quel sens ?" : "Which direction?",
             new PadOption("Normal order", IconPath: "sort"),
             new PadOption("Reversed", IconPath: "reverse"));
         if (direction is null) return;
@@ -1573,7 +1575,7 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
             "IV total (best first)" => Domain.SortCriteria.IvTotalDesc,
             "Type" => Domain.SortCriteria.Type,
             "Age (oldest first)" => Domain.SortCriteria.AgeOldest,
-            "Shiny first" => Domain.SortCriteria.ShinyFirst,
+            var shinyFirst when shinyFirst == (AppStrings.Fr ? "Chromatiques d'abord" : "Shiny first") => Domain.SortCriteria.ShinyFirst,
             _ => Domain.SortCriteria.DexNumber,
         };
         IReadOnlyList<int>? boxes = scope == "This box" ? [_viewModel.BoxIndex] : null;
@@ -1714,7 +1716,7 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
             Spacing = 8,
             Children =
             {
-                Kit.HeaderBar("RNG / IVs"),
+                Kit.HeaderBar(AppStrings.RngIvs),
                 new Label { Text = $"PID      {current.Pid:X8}", FontFamily = DsChrome.PixelFont, FontSize = 14, TextColor = UiTokens.Ink0 },
                 new Label { Text = current.EncryptionConstant is { } ec ? $"EC       {ec:X8}" : "EC       (not in this generation)", FontFamily = DsChrome.PixelFont, FontSize = 14, TextColor = UiTokens.Ink0 },
                 new Label { Text = $"IVs      {string.Join("/", current.IVs)}", FontFamily = DsChrome.PixelFont, FontSize = 14, TextColor = UiTokens.Ink0 },
@@ -1848,9 +1850,9 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
                 ? await PadMenu.ShowAsync(_hostGrid, "Legality check", $"All {results.Count} Pokémon are legal.", "OK")
                 : await PadMenu.ShowAsync(_hostGrid, "Legality check",
                     Note($"{illegal.Count} illegal of {results.Count}. The red-dotted slots in this box fail PKHeX's checks."),
-                    Menu(Allowed(SaveAction.EditMon, new("Legalize all illegal", IconPath: "fix", Detail: "Rewrite every illegal Pokémon in the save to its closest legal version.")),
+                    Menu(Allowed(SaveAction.EditMon, new(AppStrings.LegalizeAll, IconPath: "fix", Detail: AppStrings.Fr ? "Réécrit chaque Pokémon illégal de la sauvegarde vers sa version légale la plus proche." : "Rewrite every illegal Pokémon in the save to its closest legal version.")),
                         new PadOption("Close", IconPath: "close")));
-            if (choice == "Legalize all illegal")
+            if (choice == AppStrings.LegalizeAll)
                 await LegalizeAllIllegalAsync(illegal);
         }
         catch (OperationCanceledException)
@@ -2118,7 +2120,7 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
         if (Denied(SaveAction.BatchEdit)) return;
         var session = _sessionsFor();
         if (session is null) return;
-        var choice = await PadMenu.ShowAsync(_hostGrid, "Battle prep", "Every action is one backed-up write.",
+        var choice = await PadMenu.ShowAsync(_hostGrid, AppStrings.Fr ? "Préparation de combat" : "Battle prep", "Every action is one backed-up write.",
             new PadOption("Heal party", IconPath: "heal"),
             new PadOption("Heal all (party + boxes)", IconPath: "heal"),
             new PadOption("PP Max all moves", IconPath: "moves", Detail: "Max PP Ups on every move, in the party and unlocked boxes."),
@@ -2386,18 +2388,18 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
         var session = _sessionsFor();
         if (session is null) return;
         var options = Menu(
-            new PadOption("Trainer card", IconPath: "trainer"),
-            new PadOption("Bag & items", IconPath: "bag"),
+            new PadOption(AppStrings.Fr ? "Carte de dresseur" : "Trainer card", IconPath: "trainer"),
+            new PadOption(AppStrings.Fr ? "Sacoche & objets" : "Bag & items", IconPath: "bag"),
             new PadOption("Pokédex", IconPath: "pokedex"),
             Allowed(SaveAction.EditTrainer, new("Fashion", IconPath: "box", Detail: "Unlock every outfit this save can legally own (X, Y, Sword and Shield).")),
-            new PadOption("Trainer records", IconPath: "records", Detail: "The game's own trainer records, view only."),
+            new PadOption(AppStrings.Fr ? "Records du dresseur" : "Trainer records", IconPath: "records", Detail: "The game's own trainer records, view only."),
             Allowed(SaveAction.WriteRawBytes, new("Byte manipulation", IconPath: "hex", Detail: "Edit the save file's raw bytes. Written once, when you close.")),
             // Viewable in Hardcore mode; the editor itself refuses writes (EditWorld).
             Engine.EventFlagService.IsSupported(session) ? new PadOption("Event flags", IconPath: "check", Detail: "Turn story and event flags on or off, and edit event values.") : null,
             new PadOption("Wonder cards", IconPath: "events", Detail: "Mystery Gift events and the gift cards stored in this save."),
             // Viewable in Hardcore mode; each world editor refuses writes itself.
-            WorldEventsMenu.HasAny(session) ? new PadOption("World & events", IconPath: "map", Detail: "Clocks, roaming Pokémon, one-time encounters and other world data.") : null,
-            new PadOption("Export modified save", IconPath: "export", Detail: "Share a copy of the edited save file."),
+            WorldEventsMenu.HasAny(session) ? new PadOption(AppStrings.Fr ? "Monde & événements" : "World & events", IconPath: "map", Detail: "Clocks, roaming Pokémon, one-time encounters and other world data.") : null,
+            new PadOption(AppStrings.Fr ? "Exporter la sauvegarde modifiée" : "Export modified save", IconPath: "export", Detail: "Share a copy of the edited save file."),
             new PadOption("Restore points", IconPath: "history", Detail: "Backups made before each change; go back to one."),
             new PadOption("Close save", IconPath: "quit")).ToList();
         if (session.GetGrandUndergroundItems().Count != 0 && Guard.Allows(SaveAction.EditInventory))
@@ -2407,18 +2409,18 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
         var choice = await PadMenu.ShowAsync(_hostGrid, "Save data", Note(null), options.ToArray());
         switch (choice)
         {
-            case "Trainer card": await ShowTrainerCardAsync(); return;
-            case "Export modified save": await ExportModifiedSaveAsync(session); return;
+            case var c when c == (AppStrings.Fr ? "Carte de dresseur" : "Trainer card"): await ShowTrainerCardAsync(); return;
+            case var c when c == (AppStrings.Fr ? "Exporter la sauvegarde modifiée" : "Export modified save"): await ExportModifiedSaveAsync(session); return;
             case "Close save": await Navigation.PopAsync(); return;
-            case "Bag & items": await ShowBagAsync(); return;
+            case var c when c == (AppStrings.Fr ? "Sacoche & objets" : "Bag & items"): await ShowBagAsync(); return;
             case "Grand Underground": await GrandUndergroundEditor.ShowAsync(_hostGrid, session, _viewModel); return;
             case "Compass settings": await ShowCompassSettingsAsync(session); return;
             case "Pokédex": await ShowDexMenuAsync(); return;
             case "Fashion": await ShowFashionAsync(); return;
-            case "Trainer records": await ShowTrainerRecordsAsync(); return;
+            case var c when c == (AppStrings.Fr ? "Records du dresseur" : "Trainer records"): await ShowTrainerRecordsAsync(); return;
             case "Byte manipulation": await HexEditorPage.ShowAsync(_hostGrid, _viewModel, session); return;
             case "Event flags": await EventFlagsEditor.ShowAsync(_hostGrid, session, _viewModel); return;
-            case "World & events": await WorldEventsMenu.ShowAsync(_hostGrid, session, _viewModel); return;
+            case var c when c == (AppStrings.Fr ? "Monde & événements" : "World & events"): await WorldEventsMenu.ShowAsync(_hostGrid, session, _viewModel); return;
             case "Wonder cards":
             {
                 var wonderChoice = await PadMenu.ShowAsync(_hostGrid, "Wonder cards", Note(null),
@@ -2467,7 +2469,7 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
             await File.WriteAllBytesAsync(path, session.Serialize().ToArray());
             await Share.Default.RequestAsync(new ShareFileRequest
             {
-                Title = "Export modified save",
+                Title = AppStrings.Fr ? "Exporter la sauvegarde modifiée" : "Export modified save",
                 File = new ShareFile(path),
             });
             _viewModel.Status = $"Exported {Path.GetFileName(path)}";
@@ -2669,7 +2671,7 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
         var data = IPlatformApplication.Current!.Services.GetRequiredService<IGameDataService>();
         if (session.GetPokeBeans().Count != 0)
         {
-            var choice = await PadMenu.ShowAsync(_hostGrid, "Bag & items", null,
+            var choice = await PadMenu.ShowAsync(_hostGrid, AppStrings.Fr ? "Sacoche & objets" : "Bag & items", null,
                 new PadOption("Bag", IconPath: "bag"),
                 new PadOption("Poké Beans", IconPath: "item"));
             if (choice is null) return;
@@ -3800,35 +3802,35 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
         var options = new List<PadOption>();
         if (verdict is { Valid: false })
         {
-            options.Add(new("Explain legality", IconPath: "info", Detail: "Why this Pokémon is flagged, with fixes when there are any."));
+            options.Add(new(AppStrings.Fr ? "Expliquer la légalité" : "Explain legality", IconPath: "info", Detail: "Why this Pokémon is flagged, with fixes when there are any."));
             options.AddRange(Menu(
-                Allowed(SaveAction.EditMon, new("Legalize this one", IconPath: "fix", Detail: "Rewrite it to its closest legal version.")),
-                Allowed(SaveAction.EditMon, new("Legalize all illegal", IconPath: "fix", Detail: "Rewrite every illegal Pokémon in the save to its closest legal version."))));
+                Allowed(SaveAction.EditMon, new(AppStrings.Fr ? "Légaliser celui-ci" : "Legalize this one", IconPath: "fix", Detail: "Rewrite it to its closest legal version.")),
+                Allowed(SaveAction.EditMon, new(AppStrings.LegalizeAll, IconPath: "fix", Detail: AppStrings.Fr ? "Réécrit chaque Pokémon illégal de la sauvegarde vers sa version légale la plus proche." : "Rewrite every illegal Pokémon in the save to its closest legal version."))));
         }
         options.AddRange(Menu(
-            new PadOption("Summary", IconPath: "info"),
-            new PadOption("Edit", IconPath: "editor"),
-            Allowed(SaveAction.EditMon, new("Evolve…", IconPath: "evolve")),
-            new PadOption("Send to Poképark", IconPath: "park", Detail: "Adds it to the Poképark visitors. The save is not changed."),
-            new PadOption("Move", IconPath: "move", Detail: "Pick it up and carry it to another slot."),
-            Allowed(SaveAction.Duplicate, new("Duplicate", IconPath: "copy", Detail: "Clone it into the next empty slot here.")),
-            new PadOption("Send to Bank", IconPath: "bank", Detail: "It leaves this save and is stored in the Bank."),
-            Allowed(SaveAction.Duplicate, new("Copy to Bank", IconPath: "copy", Detail: "A copy goes to the Bank; the original stays here.")),
-            new PadOption("Send to another game…", IconPath: "send", Detail: "It leaves this save and joins another linked game."),
+            new PadOption(AppStrings.Fr ? "Résumé" : "Summary", IconPath: "info"),
+            new PadOption(AppStrings.Fr ? "Modifier" : "Edit", IconPath: "editor"),
+            Allowed(SaveAction.EditMon, new(AppStrings.Fr ? "Faire évoluer…" : "Evolve…", IconPath: "evolve")),
+            new PadOption(AppStrings.Fr ? "Envoyer au Poképark" : "Send to Poképark", IconPath: "park", Detail: "Adds it to the Poképark visitors. The save is not changed."),
+            new PadOption(AppStrings.Fr ? "Déplacer" : "Move", IconPath: "move", Detail: "Pick it up and carry it to another slot."),
+            Allowed(SaveAction.Duplicate, new(AppStrings.Fr ? "Dupliquer" : "Duplicate", IconPath: "copy", Detail: "Clone it into the next empty slot here.")),
+            new PadOption(AppStrings.SendToBank, IconPath: "bank", Detail: "It leaves this save and is stored in the Bank."),
+            Allowed(SaveAction.Duplicate, new(AppStrings.CopyToBank, IconPath: "copy", Detail: AppStrings.Fr ? "Une copie va dans la Banque ; l'original reste ici." : "A copy goes to the Bank; the original stays here.")),
+            new PadOption(AppStrings.Fr ? "Envoyer vers un autre jeu…" : "Send to another game…", IconPath: "send", Detail: "It leaves this save and joins another linked game."),
             Allowed(SaveAction.Duplicate, new("Copy to another game…", IconPath: "copy", Detail: "A copy joins another linked game; the original stays here.")),
-            new PadOption("Export .pk file", IconPath: "export", Detail: "Share this Pokémon as a file."),
-            new PadOption("Show as Showdown set", IconPath: "script", Detail: "Its set as Showdown text you can copy."),
-            new PadOption("Show as QR code", IconPath: "qr", Detail: "Its Showdown set as a QR code."),
-            new PadOption("Show as .pk QR", IconPath: "qr", Detail: "The whole Pokémon as a QR code that PKForge can scan into the Bank."),
-            new PadOption("RNG / IVs", IconPath: "dice", Detail: "See its PID and IVs, and change its nature without losing shininess."),
-            new PadOption("Lock / Unlock release", IconPath: "padlock", Detail: "A locked Pokémon cannot be released."),
-            new PadOption("Release", IconPath: "release"),
-            new PadOption("Release to the Wilds", IconPath: "release", Detail: "It leaves the save and lives on in the wild lands around the Poképark. It may come back to visit.")));
+            new PadOption(AppStrings.Fr ? "Exporter en fichier .pk" : "Export .pk file", IconPath: "export", Detail: "Share this Pokémon as a file."),
+            new PadOption(AppStrings.Fr ? "Afficher en set Showdown" : "Show as Showdown set", IconPath: "script", Detail: "Its set as Showdown text you can copy."),
+            new PadOption(AppStrings.Fr ? "Afficher en QR code" : "Show as QR code", IconPath: "qr", Detail: "Its Showdown set as a QR code."),
+            new PadOption(AppStrings.Fr ? "Afficher en .pk QR" : "Show as .pk QR", IconPath: "qr", Detail: "The whole Pokémon as a QR code that PKForge can scan into the Bank."),
+            new PadOption(AppStrings.RngIvs, IconPath: "dice", Detail: "See its PID and IVs, and change its nature without losing shininess."),
+            new PadOption(AppStrings.Fr ? "Verrouiller / déverrouiller le relâchement" : "Lock / Unlock release", IconPath: "padlock", Detail: "A locked Pokémon cannot be released."),
+            new PadOption(AppStrings.Release, IconPath: "release"),
+            new PadOption(AppStrings.Fr ? "Relâcher dans les terres sauvages" : "Release to the Wilds", IconPath: "release", Detail: "It leaves the save and lives on in the wild lands around the Poképark. It may come back to visit.")));
         var choice = await PadMenu.ShowAsync(_hostGrid, nickname,
             Note(verdict is { Valid: false } ? verdict.Problem : null), options.ToArray());
         switch (choice)
         {
-            case "Explain legality":
+            case var c when c == (AppStrings.Fr ? "Expliquer la légalité" : "Explain legality"):
             {
                 if (await TryShowLegalityFixesAsync()) return;
                 var detail = string.IsNullOrWhiteSpace(_viewModel.LegalityText)
@@ -3837,7 +3839,7 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
                 await ShowLegalityReportAsync(detail);
                 return;
             }
-            case "Legalize this one":
+            case var c when c == (AppStrings.Fr ? "Légaliser celui-ci" : "Legalize this one"):
             {
                 var overlay = LoadingOverlay.Show(_hostGrid, "Legalizing…", "Finding the closest real, legal version of this Pokémon.");
                 try
@@ -3848,37 +3850,37 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
                 finally { overlay.Close(); }
                 return;
             }
-            case "Send to Poképark":
+            case var c when c == (AppStrings.Fr ? "Envoyer au Poképark" : "Send to Poképark"):
                 _viewModel.Status = IPlatformApplication.Current!.Services.GetRequiredService<PokeparkService>().AddSaveVisitor(_viewModel.BoxIndex, slot);
                 return;
-            case "Summary":
+            case var c when c == (AppStrings.Fr ? "Résumé" : "Summary"):
                 await OpenSummaryAsync(slot);
                 return;
-            case "Edit":
+            case var c when c == (AppStrings.Fr ? "Modifier" : "Edit"):
                 EnterEditorFocusMode();
                 return;
-            case "Move":
+            case var c when c == (AppStrings.Fr ? "Déplacer" : "Move"):
                 if (_viewModel.BeginCarry()) _canvas.InvalidateSurface();
                 return;
-            case "Duplicate":
+            case var c when c == (AppStrings.Fr ? "Dupliquer" : "Duplicate"):
                 await DuplicateSlotAsync(slot);
                 return;
-            case "Evolve…":
+            case var c when c == (AppStrings.Fr ? "Faire évoluer…" : "Evolve…"):
                 await EvolveSlotAsync(slot);
                 return;
-            case "Send to Bank":
+            case var c when c == AppStrings.SendToBank:
                 await SendToBankAsync(slot, nickname);
                 return;
-            case "Copy to Bank":
+            case var c when c == AppStrings.CopyToBank:
                 await SendToBankAsync(slot, nickname, copyInsteadOfMove: true);
                 return;
-            case "Send to another game…":
+            case var c when c == (AppStrings.Fr ? "Envoyer vers un autre jeu…" : "Send to another game…"):
                 await SendSlotToAnotherGameAsync(slot, nickname);
                 return;
-            case "Copy to another game…":
+            case var c when c == AppStrings.CopyToAnotherGame:
                 await SendSlotToAnotherGameAsync(slot, nickname, copyInsteadOfMove: true);
                 return;
-            case "Legalize all illegal":
+            case var c when c == AppStrings.LegalizeAll:
             {
                 var overlay = default(LoadingOverlay);
                 IReadOnlyList<SlotLegality> sweep;
@@ -3897,7 +3899,7 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
                 await LegalizeAllIllegalAsync(illegal);
                 return;
             }
-            case "Show as .pk QR":
+            case var c when c == (AppStrings.Fr ? "Afficher en .pk QR" : "Show as .pk QR"):
             {
                 var session = _sessionsFor();
                 if (session is null) return;
@@ -3914,19 +3916,19 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
                     Services.QrEntityService.MakePayload(export.Data, session.Generation, detail.SpeciesName));
                 return;
             }
-            case "Show as Showdown set":
+            case var c when c == (AppStrings.Fr ? "Afficher en set Showdown" : "Show as Showdown set"):
                 await ShowShowdownAsync(slot);
                 return;
-            case "Export .pk file":
+            case var c when c == (AppStrings.Fr ? "Exporter en fichier .pk" : "Export .pk file"):
                 await ExportSlotAsync(slot);
                 return;
-            case "Show as QR code":
+            case var c when c == (AppStrings.Fr ? "Afficher en QR code" : "Show as QR code"):
                 await ShowQrAsync(slot);
                 return;
-            case "RNG / IVs":
+            case var c when c == AppStrings.RngIvs:
                 await ShowRngAsync(slot);
                 return;
-            case "Lock / Unlock release":
+            case var c when c == (AppStrings.Fr ? "Verrouiller / déverrouiller le relâchement" : "Lock / Unlock release"):
             {
                 var docId = DocumentId;
                 var session = _sessionsFor();
@@ -3938,10 +3940,10 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
                 _viewModel.Status = locked ? "Mon locked - release blocked" : "Mon unlocked";
                 return;
             }
-            case "Release":
+            case var c when c == AppStrings.Release:
                 await ReleaseSlotAsync(slot, nickname);
                 return;
-            case "Release to the Wilds":
+            case var c when c == (AppStrings.Fr ? "Relâcher dans les terres sauvages" : "Release to the Wilds"):
                 await ReleaseSlotAsync(slot, nickname, toWilds: true);
                 return;
             default:
@@ -4411,7 +4413,7 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
         View? otRow = null;
 
         var species = FocusBorder(NamedPicker("SPECIES", nameof(BoxBrowserViewModel.EditSpecies), data.SpeciesNames, null,
-            openPokedex: true, shaded: true), "Species", async () =>
+            openPokedex: true, shaded: true), AppStrings.Fr ? "Espèce" : "Species", async () =>
         {
             var session = _sessionsFor();
             if (session is null) return;
@@ -4447,7 +4449,7 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
         var ability = FocusBorder(NamedPicker("ABILITY", nameof(BoxBrowserViewModel.EditAbility), data.AbilityNames,
             AbilityItems, shaded: false), "ABILITY", async () => await OpenNamedPickerAsync("ABILITY", nameof(BoxBrowserViewModel.EditAbility), AbilityItems));
         var item = FocusBorder(NamedPicker("HELD ITEM", nameof(BoxBrowserViewModel.EditHeldItem), new LiveNames(() => SaveItemNames(data)),
-            () => ItemsWithIcons(SaveItemNames(data)), shaded: true, open: OpenItem), "Held item", OpenItem);
+            () => ItemsWithIcons(SaveItemNames(data)), shaded: true, open: OpenItem), AppStrings.Fr ? "Objet tenu" : "Held item", OpenItem);
         // Abilities start in Gen 3 and held items in Gen 2; Gen 1 stores neither.
         ability.IsVisible = (_sessionsFor()?.Generation ?? 3) >= 3;
         item.IsVisible = (_sessionsFor()?.Generation ?? 3) >= 2;
@@ -4487,7 +4489,7 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
         // Gender and shiny sit in one band, right under the nickname.
         var (genderShiny, genderHalf, shinyHalf) = GenderShinyRow();
         FocusBorder(genderHalf, "GENDER", OpenGenderPickerAsync);
-        FocusBorder(shinyHalf, "Shiny", () =>
+        FocusBorder(shinyHalf, AppStrings.Fr ? "Chromatique" : "Shiny", () =>
         {
             _viewModel.EditShiny = !_viewModel.EditShiny;
             return Task.CompletedTask;
@@ -4553,8 +4555,8 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
         // The D-pad walks the stops in the order the panel shows them.
         string[] visualOrder =
         [
-            "Species", "NICKNAME", "GENDER", "Shiny", "LEVEL",
-            "Nature", "ABILITY", "Held item", "FRIENDSHIP", "BALL", "OT",
+            AppStrings.Fr ? "Espèce" : "Species", "NICKNAME", "GENDER", AppStrings.Fr ? "Chromatique" : "Shiny", "LEVEL",
+            "Nature", "ABILITY", AppStrings.Fr ? "Objet tenu" : "Held item", "FRIENDSHIP", "BALL", "OT",
             "MOVE 1", "MOVE 2", "MOVE 3", "MOVE 4",
             .. StatNames,
             "LEGALITY", "SAVE CHANGES",
@@ -4641,7 +4643,7 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
         foreach (var line in statLines) panel.Children.Add(line);
         panel.Children.Add(EditorSection("Legality"));
         panel.Children.Add(legalityLine);
-        panel.Children.Add(EditorSection("Tools"));
+        panel.Children.Add(EditorSection(AppStrings.Fr ? "Outils" : "Tools"));
         panel.Children.Add(save);
         panel.Children.Add(monActions);
         return panel;
@@ -4912,9 +4914,15 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
     {
         var choice = await PadMenu.ShowAsync(_hostGrid, "Gender", null,
             new PadOption("Male", IconPath: "male"),
-            new PadOption("Female", IconPath: "female"),
-            new PadOption("Genderless", IconPath: "genderless"));
-        var gender = choice switch { "Male" => 0, "Female" => 1, "Genderless" => 2, _ => (int?)null };
+            new PadOption(AppStrings.Fr ? "Femelle" : "Female", IconPath: "female"),
+            new PadOption(AppStrings.Fr ? "Asexué" : "Genderless", IconPath: "genderless"));
+        var gender = choice switch
+        {
+            var male when male == "Male" => 0,
+            var female when female == (AppStrings.Fr ? "Femelle" : "Female") => 1,
+            var genderless when genderless == (AppStrings.Fr ? "Asexué" : "Genderless") => 2,
+            _ => (int?)null,
+        };
         if (gender is { } value)
         {
             SetVmString(nameof(BoxBrowserViewModel.EditGender), value.ToString());
@@ -4933,8 +4941,8 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
                     label.Text = GetVmString(nameof(BoxBrowserViewModel.EditGender)) switch
                     {
                         "0" => "Male",
-                        "1" => "Female",
-                        _ => "Genderless",
+                        "1" => AppStrings.Fr ? "Femelle" : "Female",
+                        _ => AppStrings.Fr ? "Asexué" : "Genderless",
                     };
                     return;
                 }
@@ -5123,7 +5131,7 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
             var cached = System.IO.Path.Combine(directory, ItemArt.Slug(names[id]) + ".png");
             return File.Exists(cached) ? cached : placeholder;
         }
-        var picked = await InfoPickers.ShowHeldItemsAsync(_hostGrid, "Held item", data, _sessionsFor(),
+        var picked = await InfoPickers.ShowHeldItemsAsync(_hostGrid, AppStrings.Fr ? "Objet tenu" : "Held item", data, _sessionsFor(),
             ParseInt(GetVmString(nameof(BoxBrowserViewModel.EditHeldItem))), Icon);
         if (picked is not null)
             SetVmString(nameof(BoxBrowserViewModel.EditHeldItem), picked.Id.ToString());

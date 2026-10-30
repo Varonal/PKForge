@@ -20,6 +20,10 @@ public enum SecondScreenOwner
     Summary,
     /// <summary>The Living Dex Autopilot: the route map of cartridges and travelling Pokémon.</summary>
     Autopilot,
+    /// <summary>The Trophies page: the scanned game's ladder on the lower screen.</summary>
+    Trophies,
+    /// <summary>An emulator owns the foreground: the launched game's companion shows.</summary>
+    Companion,
 }
 
 /// <summary>
