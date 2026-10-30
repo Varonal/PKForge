@@ -331,7 +331,7 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
     {
         try
         {
-            var save = Path.ChangeExtension(romPath, ".sav");
+            var save = System.IO.Path.ChangeExtension(romPath, ".sav");
             return File.Exists(save) ? save : null;
         }
         catch (ArgumentException)

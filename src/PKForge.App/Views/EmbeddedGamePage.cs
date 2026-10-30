@@ -11,7 +11,7 @@ namespace PKForge.App.Views;
 /// and this page blits it. Pixel-crisp: integer scaling only (a fractional scale
 /// would smear the GBA's 240×160), letterboxed when the screen's ratio isn't 3:2.
 /// </summary>
-public sealed class EmbeddedGamePage : ContentPage
+public sealed class EmbeddedGamePage : ContentPage, IPadHandler, IPadReleaseHandler
 {
     private readonly SKCanvasView _canvas = new() { IgnorePixelScaling = true };
     private readonly EmbeddedGameSession _session;

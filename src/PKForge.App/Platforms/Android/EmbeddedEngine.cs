@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Android.Media;
 using SkiaSharp;
 
@@ -42,14 +43,14 @@ internal sealed class EmbeddedEngine : IDisposable
         if (!core.IsRunning) throw new ArgumentException("The core has no ROM loaded.", nameof(core));
         _thread = new Thread(RunLoop) { IsBackground = true, Name = "PKForge emu" };
         _audioBuffer = Java.Nio.ByteBuffer.AllocateDirect(_audioScratch.Length * sizeof(short));
-        _audioBuffer.Order(Java.Nio.ByteOrder.LittleEndian);
+        _audioBuffer.Order(Java.Nio.ByteOrder.LittleEndian!);
         try
         {
             // 32768 Hz is the GBA's own rate. The buffer holds ~116 ms of audio
             // (3840 frames × 4 bytes): responsive, and one GC pause never starves.
             _track = new AudioTrack.Builder()
                 .SetAudioAttributes(new AudioAttributes.Builder()
-                    .SetUsage(UsageKind.Game)
+                    .SetUsage(AudioUsageKind.Game)
                     .SetContentType(AudioContentType.Game)
                     .Build())
                 .SetAudioFormat(new AudioFormat.Builder()
@@ -85,7 +86,7 @@ internal sealed class EmbeddedEngine : IDisposable
             // Nearest-neighbour: the GBA's pixels must stay square and sharp,
             // never smoothed — an integer scale of 240×160.
             var sampling = new SKSamplingOptions(SKFilterMode.Nearest, SKMipmapMode.None);
-            canvas.DrawBitmap(_frame, destination, sampling);
+            canvas.DrawImage(_frame, destination, sampling);
         }
     }
 
@@ -109,7 +110,7 @@ internal sealed class EmbeddedEngine : IDisposable
 
             // The frame is mGBA's 0x00BBGGRR little-endian: bytes R,G,B,X — the
             // bitmap's Rgba8888 row layout, copied as-is.
-            _core.CopyFrame(frame.GetPixelSpan().As<uint>());
+            _core.CopyFrame(MemoryMarshal.Cast<byte, uint>(frame.GetPixelSpan()));
 
             lock (_frameGate)
             {
