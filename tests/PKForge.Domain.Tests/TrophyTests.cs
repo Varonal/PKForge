@@ -308,10 +308,22 @@ public sealed class ConsoleRulesTests
     [Fact]
     public void InstallChecksFollowThePreferenceList()
     {
-        // The embedded core needs no package: GB is "installed" regardless of packages.
-        Assert.True(ConsoleRules.AnyInstalled(GameConsole.GameBoy, _ => false));
-        Assert.True(ConsoleRules.AnyInstalled(GameConsole.NintendoDs, id => id == "io.github.melonds"));
-        Assert.False(ConsoleRules.AnyInstalled(GameConsole.Nintendo3Ds, id => id == "com.retroarch"));
+        // The embedded core needs no package: GB counts as covered exactly when the
+        // shim is packed (EmbeddedCoreAvailable, probed at app startup).
+        var previous = EmulatorCatalog.EmbeddedCoreAvailable;
+        try
+        {
+            EmulatorCatalog.EmbeddedCoreAvailable = true;
+            Assert.True(ConsoleRules.AnyInstalled(GameConsole.GameBoy, _ => false));
+            EmulatorCatalog.EmbeddedCoreAvailable = false;
+            Assert.False(ConsoleRules.AnyInstalled(GameConsole.GameBoy, _ => false));
+            Assert.True(ConsoleRules.AnyInstalled(GameConsole.NintendoDs, id => id == "io.github.melonds"));
+            Assert.False(ConsoleRules.AnyInstalled(GameConsole.Nintendo3Ds, id => id == "com.retroarch"));
+        }
+        finally
+        {
+            EmulatorCatalog.EmbeddedCoreAvailable = previous;
+        }
     }
 }
 
