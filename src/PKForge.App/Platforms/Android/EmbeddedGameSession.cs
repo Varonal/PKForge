@@ -31,12 +31,8 @@ public sealed class EmbeddedGameSession : IDisposable
         _engine = engine;
     }
 
-    /// <summary>
-    /// Loads a ROM (and its save when given) and starts the emu thread. Returns
-    /// null when the embedded core is unavailable (no library) or the file is not
-    /// a GBA/GB ROM — the caller falls back to the external emulator path.
-    /// </summary>
-    /// <summary>True when libpkforge_mgba.so is packed in this APK (the embedded core can run).</summary>
+    /// <summary>True when libpkforge_mgba.so is packed in this APK (the embedded core can run).
+    /// Also publishes the flag to EmulatorCatalog.EmbeddedCoreAvailable for the Emulators tab.</summary>
     public static bool IsAvailable
     {
         get
@@ -53,6 +49,25 @@ public sealed class EmbeddedGameSession : IDisposable
         }
     }
 
+    /// <summary>The save file mGBA's convention names for a ROM (same name, .sav), when it exists.</summary>
+    public static string? SavePathForRom(string romPath)
+    {
+        try
+        {
+            var save = Path.ChangeExtension(romPath, ".sav");
+            return File.Exists(save) ? save : null;
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Loads a ROM (and its save when given) and starts the emu thread. Returns
+    /// null when the embedded core is unavailable (no library) or the file is not
+    /// a GBA/GB ROM — the caller shows a message instead of launching an external app.
+    /// </summary>
     public static EmbeddedGameSession? TryStart(string romPath, string? savePath)
     {
         try

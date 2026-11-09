@@ -51,7 +51,7 @@ public static class EmulatorCatalog
         new(EmulatorKind.RetroArch,
             ["com.retroarch", "com.retroarch.aarch64", "com.retroarch.ra32"],
             RomLaunchStyle.RetroArch,
-            [RetroArchCore.Gambatte, RetroArchCore.MGba, RetroArchCore.MelonDs, RetroArchCore.DesMuMe]),
+            [RetroArchCore.MelonDs, RetroArchCore.DesMuMe]),
         new(EmulatorKind.MelonDS,
             ["io.github.melonds", "me.magnum.melonds"],
             RomLaunchStyle.UriData),
@@ -82,8 +82,10 @@ public static class EmulatorCatalog
     ];
 
     public static EmulatorApp App(EmulatorKind kind) =>
-        All.FirstOrDefault(app => app.Kind == kind)
-        ?? new EmulatorApp(kind, [kind.ToString().ToLowerInvariant()], RomLaunchStyle.OpenAppOnly);
+        kind == EmulatorKind.Embedded
+            ? new EmulatorApp(kind, [], RomLaunchStyle.OpenAppOnly) // in-app core: no package, no intent
+            : All.FirstOrDefault(app => app.Kind == kind)
+              ?? new EmulatorApp(kind, [kind.ToString().ToLowerInvariant()], RomLaunchStyle.OpenAppOnly);
 
     /// <summary>The display name of an emulator ("melonDS", "Pizza Boy GBA", ...).</summary>
     public static string Name(EmulatorKind kind) => kind switch
@@ -115,13 +117,20 @@ public static class EmulatorCatalog
         _ => throw new ArgumentOutOfRangeException(nameof(core)),
     };
 
-    /// <summary>The core a Pokémon generation should run on, for GB/GBC/GBA/DS RetroArch launches.</summary>
+    /// <summary>The core a Pokémon generation should run on, for DS RetroArch launches.
+    /// Gen 1-3 play in PKForge itself (the embedded core) and throw here.</summary>
     public static RetroArchCore CoreForGeneration(int generation) => generation switch
     {
-        1 or 2 => RetroArchCore.Gambatte,
-        3 => RetroArchCore.MGba,
         4 or 5 => RetroArchCore.MelonDs,
-        _ => throw new ArgumentOutOfRangeException(nameof(generation), $"RetroArch does not run Gen {generation} Pokémon."),
+        _ => throw new ArgumentOutOfRangeException(nameof(generation), $"RetroArch runs only Gen 4-5 (DS) Pokémon here; Gen {generation} plays in PKForge."),
+    };
+
+    /// <summary>CoreForGeneration without throwing: null when the generation has no RetroArch core
+    /// (Gen 1-3 play embedded, Gen 6+ have no launch route).</summary>
+    public static RetroArchCore? CoreForGenerationSafe(int generation) => generation switch
+    {
+        4 or 5 => RetroArchCore.MelonDs,
+        _ => null,
     };
 
     /// <summary>Every folder grant of this emulator kind, as the Link flow stores them.</summary>

@@ -295,7 +295,7 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
         // a stale binding or an installed external emulator is never consulted.
         if (ConsoleRules.RunsInApp(rom.Console))
         {
-            var save = FindSaveFor(rom.FilePath);
+            var save = Platforms.Android.EmbeddedGameSession.SavePathForRom(rom.FilePath);
             var session = await Task.Run(() => Platforms.Android.EmbeddedGameSession.TryStart(rom.FilePath, save));
             if (session is not null)
             {
@@ -327,20 +327,6 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
         }
         await PadMenu.ShowAsync(_hostGrid, AppStrings.RomMissing,
             $"{SaveDescriptions.EmulatorName(kind)}: {rom.FileName}", AppStrings.Ok);
-    }
-
-    /// <summary>The save file mGBA's convention names for a ROM, when it exists.</summary>
-    private static string? FindSaveFor(string romPath)
-    {
-        try
-        {
-            var save = System.IO.Path.ChangeExtension(romPath, ".sav");
-            return File.Exists(save) ? save : null;
-        }
-        catch (ArgumentException)
-        {
-            return null;
-        }
     }
 
     /// <summary>One pass over every console's ES-DE folder; the library is replaced wholesale.</summary>

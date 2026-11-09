@@ -50,11 +50,12 @@ public sealed class RomLinkRulesTests
     [Fact]
     public void RetroArchCoresFollowTheGeneration()
     {
-        Assert.Equal(RetroArchCore.Gambatte, EmulatorCatalog.CoreForGeneration(1));
-        Assert.Equal(RetroArchCore.Gambatte, EmulatorCatalog.CoreForGeneration(2));
-        Assert.Equal(RetroArchCore.MGba, EmulatorCatalog.CoreForGeneration(3));
+        // Gen 1-3 play in PKForge's embedded core — RetroArch only names the DS core now.
         Assert.Equal(RetroArchCore.MelonDs, EmulatorCatalog.CoreForGeneration(4));
         Assert.Equal(RetroArchCore.MelonDs, EmulatorCatalog.CoreForGeneration(5));
+        Assert.Null(EmulatorCatalog.CoreForGenerationSafe(1));
+        Assert.Null(EmulatorCatalog.CoreForGenerationSafe(3));
+        Assert.Throws<ArgumentOutOfRangeException>(() => EmulatorCatalog.CoreForGeneration(3));
     }
 
     [Fact]
