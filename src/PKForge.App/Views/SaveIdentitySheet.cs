@@ -140,7 +140,7 @@ public static class SaveIdentitySheet
     /// <summary>Opens the linked GB/GBC/GBA ROM in the embedded game screen.</summary>
     private static async Task LaunchEmbeddedAsync(Grid host, RomLink link)
     {
-        var save = FindSaveFor(link.RomUri);
+        var save = Platforms.Android.EmbeddedGameSession.SavePathForRom(link.RomUri);
         var session = await Task.Run(() => Platforms.Android.EmbeddedGameSession.TryStart(link.RomUri, save));
         if (session is null)
         {
@@ -153,20 +153,6 @@ public static class SaveIdentitySheet
             if (Microsoft.Maui.Controls.Application.Current?.Windows.FirstOrDefault()?.Page is { } page)
                 await page.Navigation.PushAsync(new EmbeddedGamePage(session));
         });
-    }
-
-    /// <summary>The save file mGBA's convention names for a ROM, when it exists.</summary>
-    private static string? FindSaveFor(string romPath)
-    {
-        try
-        {
-            var save = System.IO.Path.ChangeExtension(romPath, ".sav");
-            return File.Exists(save) ? save : null;
-        }
-        catch (ArgumentException)
-        {
-            return null;
-        }
     }
 
     /// <summary>Picks a ROM for this save: the library first (one tap), the file picker as the manual path.</summary>

@@ -89,9 +89,9 @@ public static class ConsoleRules
     };
 
     /// <summary>True when one of the emulators that run this console is installed.
-    /// The embedded core counts as installed when the shim is packed (see the caller).</summary>
+    /// The embedded core counts as installed when the shim is packed (EmulatorCatalog.IsInstalled).</summary>
     public static bool AnyInstalled(GameConsole console, Func<string, bool> isPackageInstalled) =>
-        EmulatorsFor(console).Any(kind => kind == EmulatorKind.Embedded || EmulatorCatalog.IsInstalled(kind, isPackageInstalled));
+        EmulatorsFor(console).Any(kind => EmulatorCatalog.IsInstalled(kind, isPackageInstalled));
 }
 
 /// <summary>

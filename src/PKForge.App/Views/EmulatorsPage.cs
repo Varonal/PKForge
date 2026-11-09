@@ -116,18 +116,7 @@ public sealed class EmulatorsPage : ContentPage, IPadHandler
         public string Name => SaveDescriptions.EmulatorName(Kind);
         public string Systems => EmulatorCatalog.SystemsOf(Kind);
         public string State => Linked ? AppStrings.Linked : Installed ? AppStrings.NotLinked : AppStrings.NotInstalled;
-        public string Icon => Kind switch
-        {
-            EmulatorKind.RetroArch => "retroarch",
-            EmulatorKind.MelonDS => "melonds",
-            EmulatorKind.Linkboy => "linkboy",
-            EmulatorKind.Azahar or EmulatorKind.CitraMmj => "azahar",
-            EmulatorKind.Eden => "eden",
-            EmulatorKind.Dolphin => "dolphin",
-            EmulatorKind.DraStic => "drastic",
-            EmulatorKind.PizzaBoyGba or EmulatorKind.PizzaBoyGbc => "pizzaboy",
-            _ => "storage",
-        };
+        public string Icon => EmulatorChipIcon(Kind);
     }
 
     /// <summary>One console row: its bound emulator, or "choose" when unbound.</summary>

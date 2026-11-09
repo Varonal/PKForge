@@ -37,6 +37,12 @@ public sealed class AndroidEmulatorLauncher : IEmulatorLauncher
     public async Task<bool> LaunchAsync(RomLink link, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(link);
+        // The embedded core is not a package: GB/GBC/GBA never go through an intent.
+        if (link.Emulator == EmulatorKind.Embedded)
+        {
+            Services.AppLog.Info("launch", "Embedded launch requested on the external launcher; the views route it to EmbeddedGameSession instead.");
+            return false;
+        }
         var app = EmulatorCatalog.App(link.Emulator);
         var package = app.PackageIds.FirstOrDefault(IsInstalled) ?? app.PrimaryPackage;
         if (!IsInstalled(package))
@@ -190,13 +196,10 @@ public sealed class AndroidEmulatorLauncher : IEmulatorLauncher
     /// package directory; null for DS and unknowns, where RetroArch pairs on its own.</summary>
     private static string? CorePathHint(int generation, string package)
     {
-        var coreFile = generation switch
-        {
-            1 or 2 => "gambatte_libretro_android.so",
-            3 => "mgba_libretro_android.so",
-            _ => null,
-        };
-        return coreFile is null ? null : $"/data/data/{package}/cores/{coreFile}";
+        // Gen 1-3 play in PKForge itself now; only the DS generation still names a core.
+        if (EmulatorCatalog.CoreForGenerationSafe(generation) is not { } core)
+            return null;
+        return $"/data/data/{package}/cores/{EmulatorCatalog.CoreFileName(core)}";
     }
 
     /// <summary>Starts the intent; false when no activity accepted it or the ROM grant failed.</summary>
