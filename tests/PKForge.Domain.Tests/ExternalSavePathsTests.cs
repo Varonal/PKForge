@@ -70,12 +70,15 @@ public sealed class ExternalSavePathResolverTests
     [Theory]
     [InlineData(EmulatorKind.DraStic, ".dsv")]
     [InlineData(EmulatorKind.PizzaBoyGba, ".sav")]
+    [InlineData(EmulatorKind.Linkboy, ".srm")]
     [InlineData(EmulatorKind.Eden, ".bin")]
-    public void UnknownEmulatorsUseTheDefaultSiblingExtensions(EmulatorKind kind, string firstExtension)
+    public void UnknownEmulatorsUseTheDefaultSiblingExtensions(EmulatorKind kind, string specificExtension)
     {
         var paths = ExternalSavePathResolver.CandidatePaths(Rom, kind);
 
-        Assert.Equal($"{Dir}/{Stem}{firstExtension}", paths[0]);
+        // The generic .sav always comes first; the emulator's own extension is among the candidates.
+        Assert.Equal($"{Dir}/{Stem}.sav", paths[0]);
+        Assert.Contains($"{Dir}/{Stem}{specificExtension}", paths);
         Assert.Contains($"{Dir}/main", paths);
     }
 
