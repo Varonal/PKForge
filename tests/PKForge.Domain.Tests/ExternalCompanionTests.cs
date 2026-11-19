@@ -137,8 +137,8 @@ public sealed class ExternalCompanionSnapshotTests
     private sealed class SessionProxy : DispatchProxy
     {
         private SaveSnapshot? _snapshot;
-        private DexProgress _dex;
-        private TrainerStats _stats;
+        private DexProgress _dex = new(0, 0, 0);
+        private TrainerStats _stats = new(false, 0, 0, 0, false, 0, 0, false, 0, 0);
         private IReadOnlyList<string> _gameNames = [];
         private bool _throwing;
 
@@ -150,7 +150,9 @@ public sealed class ExternalCompanionSnapshotTests
             IReadOnlyList<string>? gameNames = null)
         {
             var proxy = Create<ISaveEngineSession, SessionProxy>();
-            var p = (SessionProxy)proxy;
+            // DispatchProxy.Create returns T, but the runtime object is the proxy class;
+            // cast through object because T (the interface) is not the proxy type.
+            var p = (SessionProxy)(object)proxy;
             p._throwing = throwing;
             p._snapshot = snapshot;
             p._dex = dex ?? new DexProgress(0, 0, 0);
