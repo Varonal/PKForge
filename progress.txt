@@ -20,3 +20,12 @@
   - `TrainerStats.SupportsPlayTime` doit gulter les heures/minutes (formats sans compteur → 0, pas les valeurs brutes).
   - Pas de SDK dotnet dans le sandbox de cette itération : vérif locale = checks statiques (signatures des records/membres) + CI GitHub comme source de vérité (tests Release + build APK). Ne pas bloquer sur l'absence de `dotnet` local.
 ---
+
+## 2026-11-09 ~15:15 - US-001 (CI fixes)
+- CI a révélé 3 pièges DispatchProxy, corrigés et maintenant documentés :
+  1. `DispatchProxy.Create<T, TProxy>()` retourne T (l'interface) — caster via `(TProxy)(object)proxy`, pas directement (CS0030).
+  2. La classe proxy ne peut PAS être `sealed` (ArgumentException « base type cannot be sealed »).
+  3. Les propriétés arrivent à `Invoke` comme `get_Xxx` — normaliser `get_` avant de comparer à `nameof(...)`.
+- **Apprentissage** : avec `TreatWarningsAsErrors=true`, initialiser les champs non-nullables du proxy (`= new(...)`) plutôt qu'un constructeur.
+- Résultat : CI PR #6 verte (1032 Domain + 992 Engine tests, build APK OK), PR mergeable clean.
+---
