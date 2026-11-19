@@ -1,0 +1,116 @@
+{
+  "project": "PKForge",
+  "branchName": "ralph/external-companion",
+  "description": "Companion de jeu externe (run Ralph) : garder le second écran de l'AYN Thor vivant pendant qu'un émulateur tiers tourne au premier plan. Contrairement au companion PokéDaisy natif (lecture directe de la mémoire du cœur mGBA), celui-ci est alimenté par le polling du fichier de sauvegarde .sav que l'émulateur externe écrit sur disque : stats live, dex, points de restauration.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "External companion snapshot built from a parsed save (Domain)",
+      "description": "En tant que développeur, j'ai besoin d'un snapshot pure-domain de ce que le second écran affiche pendant l'émulation externe, construit en parsant la sauvegarde du jeu (miroir de ce que LiveGbaCompanion fait avec la mémoire du cœur).",
+      "acceptanceCriteria": [
+        "Nouveau record ExternalCompanionSnapshot dans PKForge.Domain : GameLabel, GameCode, Generation, DexCaught, DexSeen, DexTotal, PartyCount, PlaytimeHours, PlaytimeMinutes, SnapshotUtc",
+        "Factory pure qui mappe un SaveFile PKHeX déjà parsé vers le snapshot, en réutilisant les extractions dex/équipe/playtime existantes (GameCompanion.cs et LiveGbaCompanion.cs comme référence)",
+        "Retourne null pour une sauvegarde non reconnue ou illisible",
+        "Le Domain reste pur : aucune dépendance Android, MAUI ou I/O fichier",
+        "Tests xunit dans tests/PKForge.Domain.Tests : sauvegarde valide, non reconnue, cas null",
+        "dotnet test tests/PKForge.Domain.Tests --configuration Release passe"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Resolve the external save file path for a launched game",
+      "description": "En tant que développeur, quand Play lance un émulateur externe, je dois résoudre le(s) fichier(s) de sauvegarde que cet émulateur écrit pour la ROM, pour que le companion puisse les surveiller.",
+      "acceptanceCriteria": [
+        "Fonction pure dans PKForge.Domain : à partir de (romPath, emulatorId, conventions connues), renvoyer les chemins candidats ordonnés par vraisemblance (.sav à côté de la ROM, .srm, dossiers saves RetroArch, etc.)",
+        "Un registre extensible des conventions par émulateur couvrant au minimum RetroArch, melonDS, Azahar et Dolphin (cohérent avec EmulatorCatalog/EmulatorDetection existants)",
+        "Fichiers absents : liste vide renvoyée, aucun crash, le companion se dégrade proprement en mode 'pas encore de sauvegarde'",
+        "Tests unitaires pour chaque convention de nommage",
+        "dotnet test tests/PKForge.Domain.Tests --configuration Release passe"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Poll and diff the save file while the external game runs",
+      "description": "En tant que joueur, je veux que le companion se rafraîchisse pendant que je joue dans un émulateur externe : l'app surveille la sauvegarde et publie un nouveau snapshot dès que l'émulateur la flush.",
+      "acceptanceCriteria": [
+        "Un moniteur (côté App/Service) interroge la sauvegarde résolue (mtime + taille toutes les ~5 s, ou équivalent à fréquence raisonnable pour la batterie)",
+        "Sauvegarde partielle ou invalide au moment du flush (checksum/parse en échec) : on saute et on garde le dernier bon snapshot, jamais de crash",
+        "Un snapshot stable est publié via IGameCompanionStore (UpdateLive ou méthode dédiée UpdateExternal) pour rafraîchir le second écran",
+        "La logique de décision (fichier changé ? save valide ? débounce) est en fonctions pures testées dans le Domain",
+        "Le polling démarre au lancement externe et s'arrête au retour dans PKForge ; jamais de polling sans session externe",
+        "dotnet test tests/PKForge.Domain.Tests --configuration Release passe"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Companion lifecycle on external launch",
+      "description": "En tant que joueur, quand Play lance un jeu dans un émulateur tiers, le second écran devient son companion, et au retour dans PKForge le companion s'arrête et le scan de trophées habituel se déclenche.",
+      "acceptanceCriteria": [
+        "Le lancement externe appelle IGameCompanionStore.Start : l'écran Thor bascule sur la surface companion externe",
+        "Au retour au premier plan de PKForge : Stop() du companion et déclenchement du watcher de trophées/scan de sauvegardes existant",
+        "Résilient si l'émulateur a été tué ou si la sauvegarde disparaît (pas de crash, repli propre)",
+        "La persistance de l'état du companion suit le pattern Infrastructure JSON atomique existant",
+        "dotnet build src/PKForge.App/PKForge.App.csproj -f net10.0-android passe",
+        "dotnet test tests/PKForge.Domain.Tests --configuration Release passe"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Restore points from the external companion",
+      "description": "En tant que joueur, je veux lister, créer et restaurer des points de restauration de la sauvegarde depuis le companion, en toute sécurité.",
+      "acceptanceCriteria": [
+        "Le companion liste les points de restauration de ce jeu, plus récent d'abord (s'appuyer sur CompanionRestorePoint et l'historique de backups existant)",
+        "Créer un point de restauration : backup nommé et horodaté de la sauvegarde via le pipeline de backup atomique existant, jamais d'écriture in-place",
+        "Restaurer : confirmation obligatoire (destructif), avec backup de sécurité de la sauvegarde courante avant restauration",
+        "Chaînes d'interface en français par défaut via le mécanisme de localisation existant, anglais disponible",
+        "Logique domaine pure testée (nommage, horodatage, ordre) ; build App et tests Domain passent"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "Play stats: session tracker and total playtime",
+      "description": "En tant que joueur, je veux voir sur le second écran la durée de ma session d'émulation externe et le temps de jeu cumulé lu dans la sauvegarde.",
+      "acceptanceCriteria": [
+        "Durée de session mesurée entre le lancement externe et le retour dans PKForge, persistée par jeu",
+        "Affichage : chrono de session, playtime de la sauvegarde, barre de progression DexPercent du snapshot",
+        "L'agrégation de session (pause/reprise/clôture) est une fonction domaine pure avec tests unitaires",
+        "Aucun measuring en arrière-plan après Stop() du companion",
+        "dotnet build src/PKForge.App/PKForge.App.csproj -f net10.0-android passe et tests Domain passent"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Finalization: companion view polish, README and full validation",
+      "description": "En tant que mainteneur, je veux la feature terminée, documentée et validée de bout en bout pour la release.",
+      "acceptanceCriteria": [
+        "La vue companion externe fonctionne sur le second écran Thor sans jamais bloquer ni recouvrir l'émulateur du premier écran",
+        "README mis à jour : 'Companion de jeu externe' déplacé de En cours vers Fait, avec une ligne de description du modèle polling .sav",
+        "Toutes les nouvelles chaînes UI en français par défaut, traduction anglaise fournie",
+        "Suite complète verte : dotnet test tests/PKForge.Domain.Tests --configuration Release et dotnet build src/PKForge.App/PKForge.App.csproj -f net10.0-android",
+        "Historique git propre : commits conventionnels (feat: US-XXX - ...), aucun WIP restant",
+        "AGENTS.md et progress.txt contiennent les apprentissages réutilisables de la run"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}
