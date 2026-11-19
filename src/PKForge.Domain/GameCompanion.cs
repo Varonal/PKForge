@@ -71,3 +71,32 @@ public interface IGameCompanionStore
     /// <summary>Back to PKForge's own lower-screen surfaces.</summary>
     void Stop();
 }
+
+/// <summary>
+/// The persisted state of an external play session (US-004): what the companion watches
+/// while an external emulator owns the foreground. Survives an app kill so the monitor
+/// resumes on next launch; cleared when the player is back in PKForge.
+/// </summary>
+/// <param name="RomPath">The launched ROM's plain file path (as the library scan found it).</param>
+/// <param name="Emulator">The external emulator the game launched in (never Embedded).</param>
+/// <param name="GameLabel">The game's shelf label.</param>
+/// <param name="GameCode">The cartridge/game code when known, empty otherwise.</param>
+/// <param name="StartedUtc">When the external launch happened.</param>
+public sealed record ExternalCompanionState(
+    string RomPath,
+    EmulatorKind Emulator,
+    string GameLabel,
+    string GameCode,
+    DateTimeOffset StartedUtc);
+
+/// <summary>
+/// Persists the external companion's active state (one small JSON document, written
+/// atomically — the Infrastructure pattern). Null means "no external session".
+/// </summary>
+public interface IExternalCompanionStateStore
+{
+    ExternalCompanionState? Current { get; }
+
+    /// <summary>Records the active external session, or clears it when <paramref name="state"/> is null.</summary>
+    void Set(ExternalCompanionState? state);
+}

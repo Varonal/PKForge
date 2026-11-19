@@ -263,6 +263,9 @@ public sealed class HomePage : ContentPage, IPadHandler
                     HabitatCatalog.Warm(park.LoadRoster().Select(mon => (mon.Species, mon.Form)));
                 });
             }
+            // App (re)started while an external game may still be running: resume the
+            // companion's save monitor from the persisted state (US-004).
+            IPlatformApplication.Current?.Services.GetService<Services.GameCompanionStore>()?.ResumeExternalIfAny();
             _viewModel.RescanCommand.Execute(null);
         }
         var host = IPlatformApplication.Current?.Services.GetService<ISecondaryDisplayHost>();
@@ -369,7 +372,9 @@ public sealed class HomePage : ContentPage, IPadHandler
         {
             var watcher = IPlatformApplication.Current?.Services.GetService<Services.TrophyWatcherService>();
             var companion = IPlatformApplication.Current?.Services.GetService<Services.GameCompanionStore>();
-            // Back from the emulator: the lower screen returns to PKForge's surfaces.
+            // Back from the emulator: stop the external save monitor (US-003/004) and the
+            // companion — the lower screen returns to PKForge's own surfaces.
+            companion?.StopExternal();
             companion?.Stop();
             if (watcher is null) return;
             await _viewModel.RescanCommand.ExecuteAsync(null);

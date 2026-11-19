@@ -56,3 +56,37 @@
   - DI : enregistrer le service concret (`AddSingleton<Services.ExternalSaveMonitor>()`) pour que les vues puissent le résoudre directement.
   - US-004 devra appeler `ExternalSaveMonitor.Start(...)` au lancement externe et `.Stop()` au retour foreground (le `TrophyWatcherService` tourne déjà sur resume — même endroit).
 ---
+
+## 2026-11-19 ~16:50 - US-004
+- Impléé le lifecycle du companion externe :
+  - **Lancement externe** : `GameCompanionStore.StartForGameAsync(link)` (déjà appelé par les deux sites Play) appelle `IGameCompanionStore.Start` puis, si `link.Emulator != Embedded`, persiste `ExternalCompanionState(RomPath, Emulator, GameLabel, GameCode, StartedUtc)` via `IExternalCompanionStateStore` et démarre `ExternalSaveMonitor.Start(...)` (US-003).
+  - **Retour dans PKForge** : `HomePage.WatchTrophiesAfterResumeAsync` (déjà appelé sur `App.Resumed`) appelle maintenant `companion.StopExternal()` (monitor.Stop + état persisté clear) puis `companion.Stop()`, puis le watcher de trophées existant re-scanne — ordre conservé.
+  - **Redémarrage de l'app mid-game** : au premier appear de HomePage (`_scannedOnce`), `ResumeExternalIfAny()` relit l'état persisté et redémarre le monitor. Si l'émulateur a été tué / la save a disparu, le watch voit `Missing` → mode no-save, aucun crash.
+- Nouveau contrat Domain : `ExternalCompanionState` record + `IExternalCompanionStateStore` (dans `GameCompanion.cs`). Persistance : `JsonExternalCompanionStateStore` (Infrastructure) — **même pattern JSON atomique** que `JsonConsoleEmulatorStore` (temp + `File.Move(overwrite:true)`, catch IOException/UnauthorizedAccess, Load tolérant au JSON corrompu → null).
+- DI : `IExternalCompanionStateStore` enregistré dans `MauiProgram` sur `FileSystem.AppDataDirectory/external-companion.json`.
+- Fichiers modifiés : `GameCompanion.cs` (contrat), `JsonExternalCompanionStateStore.cs` (nouveau), `GameCompanionStore.cs` (Start/Resume/StopExternal), `HomePage.cs` (StopExternal au resume + ResumeExternalIfAny au 1er appear), `MauiProgram.cs` (DI), `tests/.../ExternalCompanionStateStoreTests.cs` (nouveau, 5 tests : empty/set/clear/reopen-after-kill/JSON corrompu/null-path), `prd.json` (US-004 passes=true), `progress.txt`.
+- **Apprentissages pour les itérations suivantes :**
+  - Le point de « retour au premier plan » est `App.Resumed` (App.cs OnResume) → `HomePage.OnAppResumed` → `WatchTrophiesAfterResumeAsync` : c'est là que tout lifecycle « retour d'émulateur » se branche (companion Stop + rescan + trophées). Ne pas créer un second hook.
+  - Pattern persistance d'état actif : record dans le Domain + interface store + impl JSON atomique Infrastructure (temp+move) + DI sur `AppDataDirectory/<name>.json`. Le store tolère un fichier corrompu (catch JsonException → null) et un path null (mémoire seule) — testé.
+  - `RomLink.RomUri` est un chemin fichier pour les liens bibliothèque, un document id SAF pour le picker manuel : le monitor checke `File.Exists`, les deux cas passent sans crash.
+  - Pour US-005/006 : les points de restauration viennent de `IBackupService.ListAsync()` (déjà agrégés dans `StartForGameAsync`) ; l'agrégation de session (durée) suivra le pattern stamps injectés (US-003) avec persistance JSON atomique.
+---
+__EOF
+tail -2 progress.txt && git add -A && git commit -m "feat: US-004 - Companion lifecycle on external launch (start/stop/resume + atomic persisted state)
+
+- External launch: GameCompanionStore.StartForGameAsync already calls
+  IGameCompanionStore.Start; for non-Embedded emulators it now also persists
+  ExternalCompanionState and starts ExternalSaveMonitor (US-003).
+- Back in PKForge: HomePage.WatchTrophiesAfterResumeAsync (App.Resumed) calls
+  companion.StopExternal() (monitor.Stop + persisted state cleared) before
+  companion.Stop(), then the existing trophy watcher re-scans.
+- App restart mid-game: first HomePage appear calls ResumeExternalIfAny(),
+  which restarts the monitor from the persisted state. Emulator killed or
+  save gone -> the watch degrades to Missing, never crashes.
+- New Domain contract: ExternalCompanionState record + IExternalCompanionStateStore.
+  Infrastructure: JsonExternalCompanionStateStore - same atomic JSON pattern as
+  JsonConsoleEmulatorStore (temp + File.Move overwrite, corrupt file -> null).
+  Registered in MauiProgram on AppDataDirectory/external-companion.json.
+
+5 new store tests (empty, set/clear, reopen-after-kill, corrupt file, in-memory
+null path). prd.json: US-004 passes=true. progress.txt: appended learnings." && git push origin ralph/external-companion 2>&1 | tail -1 && git log --oneline -2
