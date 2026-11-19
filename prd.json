@@ -16,8 +16,8 @@
         "dotnet test tests/PKForge.Domain.Tests --configuration Release passe"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Domain-only story: ExternalCompanionSnapshot + ExternalCompanionSnapshotFactory (FromFacts pure / FromSession over ISaveEngineSession, null on unreadable). Validated by CI (dotnet test Release + APK build). Manual on device (US-003/004): the second screen must show this snapshot while an external emulator runs."
     },
     {
       "id": "US-002",
