@@ -164,7 +164,12 @@ public sealed class ExternalCompanionSnapshotTests
         protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
         {
             if (_throwing) throw new InvalidOperationException("save not recognized");
-            return targetMethod?.Name switch
+            // Property getters arrive as get_Xxx; map them to their property name so
+            // nameof() comparisons work for both getters and methods.
+            var name = targetMethod?.Name is { } n && n.StartsWith("get_", StringComparison.Ordinal)
+                ? n["get_".Length..]
+                : targetMethod?.Name;
+            return name switch
             {
                 nameof(ISaveEngineSession.Snapshot) => _snapshot,
                 nameof(ISaveEngineSession.GetDexProgress) => _dex,
@@ -172,7 +177,7 @@ public sealed class ExternalCompanionSnapshotTests
                 nameof(ISaveEngineSession.GameNames) => _gameNames,
                 nameof(ISaveEngineSession.Generation) => _snapshot?.Generation ?? 0,
                 nameof(IDisposable.Dispose) => null,
-                _ => throw new NotSupportedException(targetMethod?.Name),
+                _ => throw new NotSupportedException(name),
             };
         }
     }
