@@ -47,8 +47,8 @@
         "dotnet test tests/PKForge.Domain.Tests --configuration Release passe"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Domain decision core (ExternalSaveWatch: changed? two-identical-reads debounce -> ChangedStable; Missing; Reset) + ExternalSavePublish gate (null candidate never replaces the last good snapshot). IGameCompanionStore gains External/UpdateExternal/ClearExternal; GameCompanionStore implements them. App side: ExternalSaveMonitor (registered in MauiProgram) polls stat every 5 s via PeriodicTimer only while a session runs (Start/Stop), validates with ISaveEngine.Validate before parsing, publishes on the UI thread. 11 new Domain tests. CI: test Release + APK build. Manual on device (US-004 hooks Start/Stop): while a DS game runs in melonDS, the second screen must refresh within ~10 s of an in-game save; a mid-flush read must never blank the companion."
     },
     {
       "id": "US-004",

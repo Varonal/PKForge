@@ -15,16 +15,23 @@ public sealed partial class GameCompanionStore : ObservableObject, IGameCompanio
 
     [ObservableProperty] private LiveCompanionSnapshot? _live;
 
+    [ObservableProperty] private ExternalCompanionSnapshot? _external;
+
     public void Start(GameCompanion companion) => Current = companion;
 
     public void UpdateLive(LiveCompanionSnapshot snapshot) => Live = snapshot;
 
     public void ClearLive() => Live = null;
 
+    public void UpdateExternal(ExternalCompanionSnapshot snapshot) => External = snapshot;
+
+    public void ClearExternal() => External = null;
+
     public void Stop()
     {
         Current = null;
         Live = null;
+        External = null;
     }
 
     /// <summary>

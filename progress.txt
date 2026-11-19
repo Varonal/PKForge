@@ -42,3 +42,17 @@
   - Exposer un registre extensible en `IReadOnlyDictionary` dont l'objet runtime est un `Dictionary` mutable : le test d'extensibilité caste vers `Dictionary` — à ne faire que dans les tests, et chaque classe de test xUnit tourne séquentiellement (pas de mutation en parallèle dans la même classe).
   - Connaissance émulateurs : Dolphin = saves GCI individuelles uniquement ; Azahar/Citra = saves dans la NAND (clé = title id du nom de ROM) ; RetroArch = `.srm` à côté de la ROM ou dans `RetroArch/saves` ; melonDS = `.sav` à côté ou dans ses dossiers.
 ---
+
+## 2026-11-19 ~16:20 - US-003
+- Implémenté le cœur de décision **pur** dans le Domain (`src/PKForge.Domain/ExternalSaveWatch.cs`) : `SaveFileStamp(Path, Length, LastWriteUtc)` + `ExternalSaveWatch.Poll(stamp?)` → `NoChange | PendingStable | ChangedStable | Missing`. **Débounce à deux lectures identiques** : un fichier changé doit être relu identique une deuxième fois avant d'être parsé, donc un flush partiel en pleine écriture n'est jamais parsé. `Reset()` au changement de session. + `ExternalSavePublish.ShouldPublish(candidate, current, stamp, publishedStamp)` : un candidat null ne remplace jamais le dernier bon snapshot.
+- Contrat : `IGameCompanionStore` gagne `External`, `UpdateExternal(...)`, `ClearExternal()` ; `GameCompanionStore` (App, ObservableObject) les implémente et `Stop()` clear aussi `External`.
+- Côté App (`src/PKForge.App/Services/ExternalSaveMonitor.cs`, enregistré dans `MauiProgram`) : `PeriodicTimer` de **5 s**, actif uniquement entre `Start(romPath, emulator, label)` et `Stop()` — jamais de polling sans session externe. Résout le chemin via `ExternalSavePathResolver` (US-002), stat via `FileInfo`, décide via le Domain, puis `ISaveEngine.Validate` **avant** `OpenSession` + `ExternalCompanionSnapshotFactory.FromSession` (US-001), publie via `MainThread.BeginInvokeOnMainThread(() => UpdateExternal(...))`. Tout est try/catch : stat/read/parse en échec → on garde le dernier bon snapshot, aucun crash.
+- Fichiers modifiés : `ExternalSaveWatch.cs` (nouveau), `GameCompanion.cs` (contrat), `GameCompanionStore.cs`, `ExternalSaveMonitor.cs` (nouveau), `MauiProgram.cs` (DI), `tests/.../ExternalSaveWatchTests.cs` (nouveau, 11 tests), `prd.json` (US-003 passes=true), `progress.txt`.
+- **Apprentissages pour les itérations suivantes :**
+  - Pattern « décision pure + I/O côté App » : le Domain reçoit des **stamps injectés** (`SaveFileStamp`) et décide ; l'App fait le `FileInfo`/read/parse. Toujours ce split pour tout polling (US-006 session timer suivra le même modèle).
+  - Anti-flush-partiel : ne jamais parser sur un seul changement de mtime/taille — attendre 2 lectures identiques (débounce). Un `Validate(bytes)` avant `OpenSession` évite de parser une save tronquée.
+  - Piège timer : `PeriodicTimer.WaitForNextTickAsync` lève `ObjectDisposedException` (pas `OperationCanceledException`) quand `Stop()` dispose le timer → attraper les deux silencieusement.
+  - `Lock` (System.Threading.Lock, net9+) est le pattern de verrouillage déjà utilisé (`JsonConsoleEmulatorStore`) — réutiliser.
+  - DI : enregistrer le service concret (`AddSingleton<Services.ExternalSaveMonitor>()`) pour que les vues puissent le résoudre directement.
+  - US-004 devra appeler `ExternalSaveMonitor.Start(...)` au lancement externe et `.Stop()` au retour foreground (le `TrophyWatcherService` tourne déjà sur resume — même endroit).
+---

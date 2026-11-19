@@ -50,6 +50,9 @@ public interface IGameCompanionStore
     /// <summary>A live snapshot from the running embedded game, when one is playing.</summary>
     LiveCompanionSnapshot? Live { get; }
 
+    /// <summary>The latest snapshot polled from an external emulator's save file (US-003).</summary>
+    ExternalCompanionSnapshot? External { get; }
+
     /// <summary>Shows this game's companion on the lower screen for the whole emulation.</summary>
     void Start(GameCompanion companion);
 
@@ -58,6 +61,12 @@ public interface IGameCompanionStore
 
     /// <summary>Clears the live snapshot (the embedded game stopped).</summary>
     void ClearLive();
+
+    /// <summary>Publishes a snapshot polled from the external emulator's save file.</summary>
+    void UpdateExternal(ExternalCompanionSnapshot snapshot);
+
+    /// <summary>Clears the external snapshot (the external game stopped or its save vanished).</summary>
+    void ClearExternal();
 
     /// <summary>Back to PKForge's own lower-screen surfaces.</summary>
     void Stop();
