@@ -1,1 +1,22 @@
 
+
+## Codebase Patterns
+- **Domain = pure contracts, never PKHeX types**: `PKForge.Domain.csproj` has no ProjectReference to the engine. A "parsed PKHeX save" in Domain-speak is an open `ISaveEngineSession` (`EntityEditing.cs`) or the extracted records (`SaveSnapshot`, `DexProgress`, `TrainerStats` in `Contracts.cs`/`EntityEditing.cs`). Factories that need a save take those abstractions, so Domain tests never touch PKHeX.
+- **Faking a huge interface in tests**: `ISaveEngineSession` has ~107 members — never hand-write a fake. Use `System.Reflection.DispatchProxy` (BCL, see `ExternalCompanionTests.SessionProxy`): configured members return values, everything else throws (which doubles as the "unreadable save" case).
+- **Party vs boxes in a snapshot**: `SaveSnapshot.Slots` holds boxes at `Box >= 0` and the party at `Box == -1` (see `SaveEngineSession.BuildSnapshot`); party count = slots with `Box == -1 && Species > 0`, clamp to 6.
+- **Playtime truth**: `TrainerStats.SupportsPlayTime` gates `PlayTimeHours/Minutes`; the shelf's `PlayTime` string is only a fallback (pattern in `TrophyScanService.TryParsePlaytime`).
+- **Companion snapshot shape**: mirror `GameCompanion.cs` / `LiveGbaCompanion.cs` — flat record + `DexPercent` computed property (`DexTotal == 0 ? 0 : round(caught*100/total)`).
+- **Persistence**: Infrastructure JSON stores write atomically (pattern in `JsonConsoleEmulatorStore`); reuse for any new persisted state.
+- **Ralph loop mechanics**: branch name comes from `prd.json` `branchName`; one story per iteration = highest priority with `passes: false`; commit `feat: US-XXX - ...`; set `passes: true` + `notes` (manual device checks go in notes, never block); APPEND to `progress.txt`, never overwrite.
+- **This sandbox has no .NET SDK**: validate via static checks locally, CI (`build` workflow on PR/push) runs `dotnet test` Release + the net10.0-android APK build. Wait for the PR check before merging.
+
+## 2026-11-09 ~12:30 - US-001
+- Implémenté `ExternalCompanionSnapshot` (GameLabel, GameCode, Generation, DexCaught, DexSeen, DexTotal, PartyCount, PlaytimeHours, PlaytimeMinutes, SnapshotUtc + DexPercent) et `ExternalCompanionSnapshotFactory` avec `FromFacts` (pur, testable) et `FromSession` (over `ISaveEngineSession`, try/catch → null si save non reconnue/illisible).
+- Fichiers modifiés : `src/PKForge.Domain/ExternalCompanion.cs` (nouveau), `tests/PKForge.Domain.Tests/ExternalCompanionTests.cs` (nouveau, 8 tests), `prd.json` (US-001 passes=true), `progress.txt` (append).
+- **Apprentissages pour les itérations suivantes :**
+  - Le Domain ne référence jamais PKHeX : « SaveFile déjà parsé » = `ISaveEngineSession` ou records extraits (`SaveSnapshot`/`DexProgress`/`TrainerStats`). Toujours mapper via ces records pour rester testable.
+  - Piège : `ISaveEngineSession` fait ~107 membres — ne jamais écrire un fake à la main, utiliser `DispatchProxy`.
+  - Piège : `SlotSummary.Box == -1` = party (pas un box), compter `Species > 0` et clamper à 6.
+  - `TrainerStats.SupportsPlayTime` doit gulter les heures/minutes (formats sans compteur → 0, pas les valeurs brutes).
+  - Pas de SDK dotnet dans le sandbox de cette itération : vérif locale = checks statiques (signatures des records/membres) + CI GitHub comme source de vérité (tests Release + build APK). Ne pas bloquer sur l'absence de `dotnet` local.
+---
