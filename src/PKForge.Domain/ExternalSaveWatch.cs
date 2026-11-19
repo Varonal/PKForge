@@ -39,7 +39,8 @@ public sealed class ExternalSaveWatch
     private SaveFileStamp? _lastRead;
     private SaveFileStamp? _pendingCandidate;
 
-    /// <summary>The stamp of the last save we actually parsed and published (null = none yet).</summary>
+    /// <summary>The stamp of the last save we actually parsed and published (null = none yet).
+    /// Cleared when the watched file disappears: the companion degrades to its no-save mode.</summary>
     public SaveFileStamp? LastPublished { get; private set; }
 
     /// <summary>
@@ -53,6 +54,7 @@ public sealed class ExternalSaveWatch
         {
             _lastRead = null;
             _pendingCandidate = null;
+            LastPublished = null; // the save vanished: nothing is "published" anymore
             return SaveWatchDecision.Missing;
         }
         if (!current.DiffersFrom(_lastRead))
