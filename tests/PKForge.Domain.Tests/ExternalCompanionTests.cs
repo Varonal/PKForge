@@ -134,7 +134,7 @@ public sealed class ExternalCompanionSnapshotTests
     /// members the factory reads return values; everything else throws, which doubles as
     /// the "unreadable save" case when <paramref name="throwing"/> is set.
     /// </summary>
-    private sealed class SessionProxy : DispatchProxy
+    private class SessionProxy : DispatchProxy
     {
         private SaveSnapshot? _snapshot;
         private DexProgress _dex = new(0, 0, 0);
