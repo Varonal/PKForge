@@ -31,8 +31,8 @@
         "dotnet test tests/PKForge.Domain.Tests --configuration Release passe"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Domain-only story: ExternalSavePathResolver (pure path algebra, no I/O; existence via injected Func<string,bool>). Conventions registry covers RetroArch, melonDS, Azahar/CitraMmj (NAND via title id in ROM name), Dolphin (.gci only); default sibling .sav/.srm/.dsv/.bin + 'main'. Empty list when no save on disk yet. 12 xunit tests. Validated by CI (test Release + APK build). Manual on device (US-003): the companion must pick up the real .srm/.sav an emulator writes while playing externally."
     },
     {
       "id": "US-003",
