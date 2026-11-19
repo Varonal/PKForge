@@ -63,8 +63,8 @@
         "dotnet test tests/PKForge.Domain.Tests --configuration Release passe"
       ],
       "priority": 4,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Lifecycle wired: external Play -> GameCompanionStore.StartForGameAsync already calls IGameCompanionStore.Start, and now also persists ExternalCompanionState (JSON atomique, JsonExternalCompanionStateStore) + ExternalSaveMonitor.Start (US-003). Resume in PKForge -> HomePage.WatchTrophiesAfterResumeAsync calls StopExternal() (monitor.Stop + state cleared) + companion.Stop() then the existing trophy watcher re-scans. App restart mid-game -> HomePage first appear calls ResumeExternalIfAny() to restart the monitor from the persisted state; if the emulator/save are gone the watch degrades to Missing (no crash). 5 store tests. CI: build APK + tests Release. Manual on device: launch a DS game in melonDS -> second screen shows companion; kill the emulator -> return to PKForge -> companion stops, trophy scan runs, no crash; kill PKForge mid-game -> relaunch -> monitor resumes from persisted state."
     },
     {
       "id": "US-005",

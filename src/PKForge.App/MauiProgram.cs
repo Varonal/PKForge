@@ -105,6 +105,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<Services.TrophyWatcherService>();
         builder.Services.AddSingleton<IConsoleEmulatorStore>(new Infrastructure.JsonConsoleEmulatorStore(
             Path.Combine(FileSystem.AppDataDirectory, "console-emulators.json")));
+        builder.Services.AddSingleton<IExternalCompanionStateStore>(new Infrastructure.JsonExternalCompanionStateStore(
+            Path.Combine(FileSystem.AppDataDirectory, "external-companion.json")));
         builder.Services.AddSingleton<IRomLibraryStore>(new Infrastructure.JsonRomLibraryStore(
             Path.Combine(FileSystem.AppDataDirectory, "rom-library.json")));
 #if ANDROID
