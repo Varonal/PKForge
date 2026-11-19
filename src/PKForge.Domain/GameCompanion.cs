@@ -100,5 +100,3 @@ public interface IExternalCompanionStateStore
     /// <summary>Records the active external session, or clears it when <paramref name="state"/> is null.</summary>
     void Set(ExternalCompanionState? state);
 }
-EOF
-echo OK
