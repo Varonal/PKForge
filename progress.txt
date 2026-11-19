@@ -29,3 +29,16 @@
 - **Apprentissage** : avec `TreatWarningsAsErrors=true`, initialiser les champs non-nullables du proxy (`= new(...)`) plutôt qu'un constructeur.
 - Résultat : CI PR #6 verte (1032 Domain + 992 Engine tests, build APK OK), PR mergeable clean.
 ---
+
+## 2026-11-19 ~15:40 - US-002
+- Implémenté `ExternalSavePathResolver` (`src/PKForge.Domain/ExternalSavePaths.cs`) : résolution **pure** des chemins candidats de sauvegarde pour (romPath, EmulatorKind) — aucune I/O, séparateurs '/' normalisés, `StorageRoot = /storage/emulated/0`.
+- Registre extensible `Conventions` (IReadOnlyDictionary<EmulatorKind, Func<string, IReadOnlyList<string>>>) couvrant RetroArch (sibling .srm/.sav puis RetroArch/saves), melonDS (sibling .sav puis dossiers melonDS + Android/data), Azahar/CitraMmj (sibling .sav + NAND `nand/data/<titleid>/save/00000001` quand le nom de ROM contient `(16 hex)`), Dolphin (.gci uniquement, jamais .raw/.gcp — cohérent avec `EmulatorSaveHeuristics.IsCandidateFileName(kind: Dolphin)`), et une convention par défaut (.sav/.srm/.dsv/.bin + `main`) pour DraStic/Linkboy/PizzaBoy/Eden.
+- `CandidatePaths(romPath, kind)` = tous les candidats ordonnés ; `ExistingPaths(romPath, kind, fileExists)` = filtrés via prédicat injecté → **liste vide si aucun fichier** (mode « pas encore de sauvegarde », aucun crash). romPath null/vide → liste vide.
+- Fichiers modifiés : `src/PKForge.Domain/ExternalSavePaths.cs` (nouveau), `tests/PKForge.Domain.Tests/ExternalSavePathsTests.cs` (nouveau, 12 tests : chaque convention, title id Azahar, normalisation `\`→`/`, rom sans dossier, liste vide, extensibilité du registre), `prd.json` (US-002 passes=true), `progress.txt` (append).
+- **Apprentissages pour les itérations suivantes :**
+  - Pattern « chemin pur » : le Domain fait de l'algèbre de chemins mais **jamais d'I/O disque** — l'existence passe par un `Func<string,bool>` injecté (`ExistingPaths`), ce qui rend le tout testable et fait de « fichier absent » une liste vide, pas une exception. Réutiliser ce pattern pour US-003 (polling mtime/taille via prédicat/lecteur injecté).
+  - `System.IO.Path` est déjà accepté dans le Domain (voir `WonderCardQol.cs`), mais pour des chemins Android il faut normaliser `\`→`/` soi-même (les tests tournent sur Linux CI).
+  - `[GeneratedRegex]` exige une classe `partial` — OK sur net10.0, et `using System.Text.RegularExpressions;` n'est PAS dans les ImplicitUsings de base.
+  - Exposer un registre extensible en `IReadOnlyDictionary` dont l'objet runtime est un `Dictionary` mutable : le test d'extensibilité caste vers `Dictionary` — à ne faire que dans les tests, et chaque classe de test xUnit tourne séquentiellement (pas de mutation en parallèle dans la même classe).
+  - Connaissance émulateurs : Dolphin = saves GCI individuelles uniquement ; Azahar/Citra = saves dans la NAND (clé = title id du nom de ROM) ; RetroArch = `.srm` à côté de la ROM ou dans `RetroArch/saves` ; melonDS = `.sav` à côté ou dans ses dossiers.
+---
