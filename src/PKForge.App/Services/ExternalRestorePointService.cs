@@ -40,7 +40,7 @@ public sealed class ExternalRestorePointService(IBackupService backups, ISaveEng
     public async Task<bool> RestoreAsync(Grid host, string savePath, string backupId, CancellationToken cancellationToken = default)
     {
         var confirmed = await PadMenu.ConfirmAsync(host,
-            AppStrings.RestorePointTitle, AppStrings.RestorePointConfirm, AppStrings.Restore).ConfigureAwait(false);
+            AppStrings.RestoreThisPoint, AppStrings.RestorePointConfirm, AppStrings.Restore).ConfigureAwait(false);
         if (!confirmed) return false;
 
         try

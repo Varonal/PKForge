@@ -62,16 +62,14 @@ public static class AppStrings
     public static string RomMissing => Fr ? "Émulateur manquant" : "Emulator missing";
 
     // ---- External companion: restore points ----
-    public static string RestorePointsTitle => Fr ? "Points de restauration" : "Restore points";
+    // (RestorePointsTitle / Restore / RestoreThisPoint already exist in the "Restore points" section below.)
     public static string NoRestorePoints => Fr ? "Aucun point pour ce jeu." : "No restore point for this game.";
     public static string CreateRestorePoint => Fr ? "Créer un point de restauration" : "Create a restore point";
     public static string RestorePointCreated => Fr ? "Point de restauration créé." : "Restore point created.";
     public static string RestorePointCreateFailed => Fr ? "Impossible de créer le point (sauvegarde illisible ?)." : "Could not create the point (save unreadable?).";
-    public static string RestorePointTitle => Fr ? "Restaurer ce point ?" : "Restore this point?";
     public static string RestorePointConfirm => Fr
         ? "La sauvegarde du jeu sera remplacée par ce point. Une sauvegarde de sécurité est faite d'abord."
         : "The game's save will be replaced by this point. A safety backup is made first.";
-    public static string Restore => Fr ? "Restaurer" : "Restore";
     public static string RestoreDone => Fr ? "Point restauré. Relancez le jeu pour le charger." : "Point restored. Relaunch the game to load it.";
     public static string RestoreFailed => Fr ? "La restauration a échoué (point illisible ?)." : "Restore failed (point unreadable?).";
 
