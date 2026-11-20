@@ -35,25 +35,54 @@ public interface IRomLinkStore
 /// <summary>Which emulator a linked ROM should launch with, and whether PKForge can hand it over directly.</summary>
 public static class RomLinkRules
 {
+    /// <summary>Generations with an in-process PKForge core. A stale saved emulator
+    /// selection must never send one of these Pokémon ROMs to another app.</summary>
+    public static bool UsesIntegratedCore(int generation) => generation is >= 1 and <= 5;
+
+    /// <summary>Whether this Pokémon ROM belongs to an integrated generation or carries
+    /// a DS cartridge extension that must never be handed to an external emulator.</summary>
+    public static bool MustRunInApp(int generation, string romFileName) =>
+        UsesIntegratedCore(generation) || ExtensionOf(romFileName) is ".nds" or ".dsi";
+
+    /// <summary>Uses the generation stored on a save link, then the recognized Pokémon
+    /// edition in its ROM filename. Unknown editions remain unresolved.</summary>
+    public static int ResolveIntegratedGeneration(int generation, string romFileName)
+    {
+        if (UsesIntegratedCore(generation)) return generation;
+        var inferred = RomNameRules.GenerationOf(RomNameRules.GameName(romFileName));
+        return UsesIntegratedCore(inferred) ? inferred : 0;
+    }
+
+    /// <summary>Formats that the currently integrated cores can load or safely materialize.</summary>
+    public static bool IsSupportedEmbeddedFormat(int generation, string romFileName)
+    {
+        ArgumentNullException.ThrowIfNull(romFileName);
+        var extension = ExtensionOf(romFileName);
+        return generation switch
+        {
+            1 or 2 => extension is ".gb" or ".gbc",
+            3 => extension == ".gba",
+            4 or 5 => extension is ".nds" or ".zip",
+            _ => false,
+        };
+    }
+
     /// <summary>
-    /// The emulators that can run this ROM, best first, inferred from the generation and the
-    /// file extension. The player's linked choice always wins over this preference order.
+    /// The currently supported core for this ROM, inferred from generation, extension and
+    /// the matching embedded library. Integrated Pokémon generations have no external fallback.
     /// </summary>
     public static IReadOnlyList<EmulatorKind> EmulatorsForRom(int generation, string romFileName)
     {
         if (!GenerationKnows(generation))
             return [];
-        var extension = ExtensionOf(romFileName);
-        if (generation <= 2 && extension is not (".gb" or ".gbc" or ".zip" or ".7z"))
-            return [];
-        if (generation == 3 && extension is not (".gba" or ".zip" or ".7z"))
-            return [];
-        if (generation is 4 or 5 && extension is not (".nds" or ".dsi" or ".zip" or ".7z"))
+        if (!IsSupportedEmbeddedFormat(generation, romFileName))
             return [];
         return generation switch
         {
-            1 or 2 or 3 => [EmulatorKind.Embedded],
-            4 or 5 => [EmulatorKind.MelonDS, EmulatorKind.RetroArch, EmulatorKind.DraStic],
+            1 or 2 or 3 when EmulatorCatalog.EmbeddedCoreAvailable => [EmulatorKind.Embedded],
+            1 or 2 or 3 => [],
+            4 or 5 when EmulatorCatalog.EmbeddedDsCoreAvailable => [EmulatorKind.Embedded],
+            4 or 5 => [],
             _ => [],
         };
     }

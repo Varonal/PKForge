@@ -13,32 +13,70 @@ namespace PKForge.App.Platforms.Android;
 internal sealed class MgbaCore : Domain.IEmbeddedCore
 {
     private nint _core;
+    private (int Width, int Height) _videoSize;
+    private string _gameTitle = string.Empty;
+    private string _gameCode = string.Empty;
 
     public bool IsRunning { get; private set; }
 
     public string? RomPath { get; private set; }
+    public string? LoadError { get; private set; }
 
     public bool Load(string romPath, string? savePath = null)
     {
-        if (IsRunning) return false;
+        LoadError = null;
+        if (IsRunning)
+        {
+            LoadError = "Une ROM est déjà chargée dans ce cœur.";
+            return false;
+        }
+
         var core = MgbaNative.CoreCreate(romPath);
-        if (core == nint.Zero) return false;
+        if (core == nint.Zero)
+        {
+            LoadError = "mGBA ne reconnaît pas ce fichier comme une ROM GB, GBC ou GBA valide.";
+            return false;
+        }
+
+        var initialized = false;
         try
         {
             if (MgbaNative.CoreLoad(core, romPath, savePath) == 0)
             {
-                MgbaNative.CoreDestroy(core);
+                LoadError = "mGBA a reconnu la ROM, mais n'a pas pu charger son contenu ou sa sauvegarde. Vérifie le fichier et ses droits d'accès.";
                 return false;
             }
+
+            var videoSize = ReadVideoSize(core);
+            if (videoSize.Width <= 0 || videoSize.Height <= 0)
+            {
+                LoadError = "mGBA n'a pas fourni de dimensions vidéo valides pour cette ROM.";
+                return false;
+            }
+
+            var gameTitle = ReadGameTitle(core);
+            var gameCode = ReadGameCode(core);
             _core = core;
+            _videoSize = videoSize;
+            _gameTitle = gameTitle;
+            _gameCode = gameCode;
             RomPath = romPath;
             IsRunning = true;
+            initialized = true;
             return true;
         }
-        catch (Exception)
+        catch (Exception error)
         {
-            try { MgbaNative.CoreDestroy(core); } catch (DllNotFoundException) { }
+            LoadError = $"Erreur pendant le chargement natif : {error.Message}";
             return false;
+        }
+        finally
+        {
+            if (!initialized)
+            {
+                try { MgbaNative.CoreDestroy(core); }
+                catch (Exception error) { Services.AppLog.Warn("embedded", $"Could not release a failed mGBA core: {error.Message}"); }
+            }
         }
     }
 
@@ -55,36 +93,39 @@ internal sealed class MgbaCore : Domain.IEmbeddedCore
 
     public string GameTitle
     {
-        get
-        {
-            if (!IsRunning) return string.Empty;
-            Span<byte> title = stackalloc byte[17];
-            MgbaNative.CoreGameTitle(_core, title);
-            var length = title.IndexOf((byte)0);
-            return length < 0 ? Encoding.ASCII.GetString(title) : Encoding.ASCII.GetString(title[..length]);
-        }
+        get => IsRunning ? _gameTitle : string.Empty;
     }
 
     public string GameCode
     {
-        get
-        {
-            if (!IsRunning) return string.Empty;
-            Span<byte> code = stackalloc byte[5];
-            MgbaNative.CoreGameCode(_core, code);
-            var length = code.IndexOf((byte)0);
-            return length < 0 ? Encoding.ASCII.GetString(code) : Encoding.ASCII.GetString(code[..length]);
-        }
+        get => IsRunning ? _gameCode : string.Empty;
     }
 
     public (int Width, int Height) VideoSize
     {
-        get
-        {
-            if (!IsRunning) return (0, 0);
-            MgbaNative.CoreVideoSize(_core, out var width, out var height);
-            return ((int)width, (int)height);
-        }
+        get => IsRunning ? _videoSize : (0, 0);
+    }
+
+    private static string ReadGameTitle(nint core)
+    {
+        Span<byte> title = stackalloc byte[17];
+        MgbaNative.CoreGameTitle(core, title);
+        var length = title.IndexOf((byte)0);
+        return length < 0 ? Encoding.ASCII.GetString(title) : Encoding.ASCII.GetString(title[..length]);
+    }
+
+    private static string ReadGameCode(nint core)
+    {
+        Span<byte> code = stackalloc byte[5];
+        MgbaNative.CoreGameCode(core, code);
+        var length = code.IndexOf((byte)0);
+        return length < 0 ? Encoding.ASCII.GetString(code) : Encoding.ASCII.GetString(code[..length]);
+    }
+
+    private static (int Width, int Height) ReadVideoSize(nint core)
+    {
+        MgbaNative.CoreVideoSize(core, out var width, out var height);
+        return ((int)width, (int)height);
     }
 
     public void CopyFrame(Span<uint> buffer)
@@ -108,6 +149,14 @@ internal sealed class MgbaCore : Domain.IEmbeddedCore
     {
         if (!IsRunning || destination.IsEmpty) return false;
         return MgbaNative.CoreReadBytes(_core, address, destination, (UIntPtr)destination.Length) != 0;
+    }
+
+    /// <summary>Copies mGBA's raw battery data without relying on the cartridge bus window.</summary>
+    public int CopySavedata(Span<byte> destination)
+    {
+        if (!IsRunning || destination.IsEmpty) return 0;
+        var copied = MgbaNative.CoreCopySavedata(_core, destination, (UIntPtr)destination.Length).ToUInt64();
+        return copied <= (ulong)destination.Length ? (int)copied : 0;
     }
 
     public uint? Read32(uint address)
@@ -137,6 +186,12 @@ internal sealed class MgbaCore : Domain.IEmbeddedCore
     {
         ThrowWhenNotRunning();
         return MgbaNative.CoreLoadState(_core, path) != 0;
+    }
+
+    public bool FlushSave(string path)
+    {
+        ThrowWhenNotRunning();
+        return MgbaNative.CoreFlushSave(_core, path) != 0;
     }
 
     public void Dispose()

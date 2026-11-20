@@ -17,9 +17,53 @@ public sealed partial class GameCompanionStore : ObservableObject, IGameCompanio
 
     [ObservableProperty] private ExternalCompanionSnapshot? _external;
 
-    public void Start(GameCompanion companion) => Current = companion;
+    [ObservableProperty] private bool _speedControlAvailable;
+
+    [ObservableProperty] private int _speedMultiplier = 1;
+
+    private Action<int>? _applySpeedMultiplier;
+
+    public void Start(GameCompanion companion)
+    {
+        ClearSpeedControl();
+        Live = null;
+        External = null;
+        Current = companion;
+    }
 
     public void UpdateLive(LiveCompanionSnapshot snapshot) => Live = snapshot;
+
+    public void BindSpeedControl(int multiplier, Action<int> apply)
+    {
+        ArgumentNullException.ThrowIfNull(apply);
+        if (multiplier is < 1 or > 4)
+            throw new ArgumentOutOfRangeException(nameof(multiplier));
+
+        _applySpeedMultiplier = apply;
+        SpeedMultiplier = multiplier;
+        SpeedControlAvailable = true;
+    }
+
+    public void RequestSpeedMultiplier(int multiplier)
+    {
+        if (multiplier is < 1 or > 4)
+            throw new ArgumentOutOfRangeException(nameof(multiplier));
+        if (SpeedControlAvailable)
+            _applySpeedMultiplier?.Invoke(multiplier);
+    }
+
+    public void UpdateSpeedMultiplier(int multiplier)
+    {
+        if (multiplier is < 1 or > 4)
+            throw new ArgumentOutOfRangeException(nameof(multiplier));
+        SpeedMultiplier = multiplier;
+    }
+
+    public void ClearSpeedControl()
+    {
+        _applySpeedMultiplier = null;
+        SpeedControlAvailable = false;
+    }
 
     public void ClearLive() => Live = null;
 
@@ -29,6 +73,7 @@ public sealed partial class GameCompanionStore : ObservableObject, IGameCompanio
 
     public void Stop()
     {
+        ClearSpeedControl();
         Current = null;
         Live = null;
         External = null;
@@ -47,11 +92,19 @@ public sealed partial class GameCompanionStore : ObservableObject, IGameCompanio
         var points = new List<CompanionRestorePoint>();
         try
         {
-            if (services?.GetService<IBackupService>() is { } backups)
+            // Only show points when they can be tied to this exact linked save.
+            // Library-only links and external emulator saves have no safe match here.
+            if (link.Emulator == EmulatorKind.Embedded
+                && !string.IsNullOrWhiteSpace(link.SaveDocumentId)
+                && !string.Equals(link.SaveDocumentId, "library", StringComparison.OrdinalIgnoreCase)
+                && services?.GetService<IBackupService>() is { } backups)
             {
-                foreach (var info in await backups.ListAsync())
-                    points.Add(new CompanionRestorePoint(info.BackupId, info.CreatedUtc, info.Sha256));
-                points.Reverse(); // newest first
+                var linkedPoints = (await backups.ListAsync())
+                    .Where(info => string.Equals(info.DocumentId, link.SaveDocumentId, StringComparison.Ordinal))
+                    .OrderByDescending(info => info.CreatedUtc)
+                    .Take(8);
+                points.AddRange(linkedPoints.Select(info =>
+                    new CompanionRestorePoint(info.BackupId, info.CreatedUtc, info.Sha256)));
             }
         }
         catch (Exception error)

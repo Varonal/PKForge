@@ -2,9 +2,9 @@ namespace PKForge.Domain;
 
 /// <summary>
 /// The embedded emulator core's contract: PKForge runs the game itself (the
-/// PokeDaisy model — the core in-process, the companion reads its memory live)
-/// instead of handing the ROM to an external emulator. The GBA/GB core (mGBA)
-/// comes first; the same shape extends to DS (melonDS) later.
+/// PokeDaisy model — the core runs in-process and the companion reads its data)
+/// instead of handing the ROM to an external emulator. This contract covers mGBA;
+/// DS sessions use a separate page contract for two screens and stylus input.
 /// </summary>
 public interface IEmbeddedCore : IDisposable
 {
@@ -72,4 +72,21 @@ public static class GbaKeys
     public const uint Down = 1 << 7;
     public const uint R = 1 << 8;
     public const uint L = 1 << 9;
+}
+
+/// <summary>The Nintendo DS active-high key bits consumed by melonDS.</summary>
+public static class NdsKeys
+{
+    public const uint A = 1 << 0;
+    public const uint B = 1 << 1;
+    public const uint Select = 1 << 2;
+    public const uint Start = 1 << 3;
+    public const uint Right = 1 << 4;
+    public const uint Left = 1 << 5;
+    public const uint Up = 1 << 6;
+    public const uint Down = 1 << 7;
+    public const uint R = 1 << 8;
+    public const uint L = 1 << 9;
+    public const uint X = 1 << 10;
+    public const uint Y = 1 << 11;
 }

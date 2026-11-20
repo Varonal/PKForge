@@ -1334,7 +1334,7 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
         // these slots in one write, and a failed release takes the batch back out of that game.
         var items = marked.Select(m => session.ExportSlot(m.Box, m.Slot))
             .Select(export => new PKForge.Engine.TransferItem(export.Data, export.Format, export.FileName)).ToArray();
-        IReadOnlyList<SlotRef> landed = [];
+        IReadOnlyList<Services.TransferLanding> landed = [];
         var outcome = await PKForge.Engine.BankTransfers.MoveAsync(items.Length, target.GameLabel,
             async () =>
             {
@@ -1342,12 +1342,27 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
                     $"{items.Length} Pokémon arrived from a transfer", startAt: startAt);
                 return refusal;
             },
-            copy ? null : async () => await _viewModel.BulkReleaseAsync(marked) ? null : _viewModel.Status,
-            async () =>
+            copy ? null : async () =>
             {
-                await transfer.ReleaseFromGameAsync(target, landed, $"{items.Length} Pokémon sent back: the transfer was undone");
-                return null;
-            });
+                var released = await _viewModel.RunMutationAsync(s =>
+                {
+                    for (var i = 0; i < marked.Length; i++)
+                    {
+                        var current = s.ExportSlot(marked[i].Box, marked[i].Slot);
+                        if (!current.Data.AsSpan().SequenceEqual(items[i].Data))
+                            return new GenerationOutcome(false,
+                                $"{BoxBrowserViewModel.SlotLabel(marked[i].Box, marked[i].Slot)} changed during transfer; all source Pokémon were left untouched.");
+                    }
+                    foreach (var (box, slot) in marked)
+                        s.ReleaseSlot(box, slot);
+                    return new GenerationOutcome(true, $"Moved {items.Length} Pokémon to {target.GameLabel}.");
+                }, Math.Max(0, _viewModel.SelectedSlot), refreshSlot: false, action: SaveAction.Move);
+                _viewModel.RefreshAllSlots();
+                if (released) _viewModel.ClearMarksQuietly();
+                return released ? null : _viewModel.Status;
+            },
+            async () => await transfer.UndoTransferAsync(target, landed,
+                $"{items.Length} Pokémon sent back: the transfer was undone"));
         if (outcome.Success && copy) _viewModel.ClearMarksQuietly();
         _viewModel.Status = outcome.Message;
     }
@@ -4161,8 +4176,8 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
     }
 
     /// <summary>
-    /// Game-to-game: pick any other detected save, the transfer service converts and
-    /// writes there, then the mon leaves this box (a real move, not a copy).
+    /// Game-to-game: preview, write the destination, release the source, and undo the
+    /// destination if the source write fails. The destination undo verifies its receipt.
     /// </summary>
     private async Task SendSlotToAnotherGameAsync(int slot, string nickname, bool copyInsteadOfMove = false)
     {
@@ -4196,17 +4211,28 @@ public sealed partial class BoxBrowserPage : ContentPage, IPadPagingHandler, IPa
         var export = session.ExportSlot(_viewModel.BoxIndex, slot);
         // Cross-generation conversions change things; the diff preview is the trust
         // step before the write. Same-generation sends show an empty diff.
-        var preview = await transfer.PreviewAsync(export.Data, nickname, target);
+        var preview = await transfer.PreviewAsync(export.Data, nickname, target, format: export.Format);
         if (!await Services.TransferPreviewPrompt.ConfirmAsync(_hostGrid, preview, nickname, target.GameLabel)) return;
-        var outcome = await transfer.SendToGameAsync(export.Data, nickname, target);
+        Services.TransferLanding? landed = null;
+        var outcome = await PKForge.Engine.BankTransfers.MoveAsync(1, target.GameLabel,
+            async () =>
+            {
+                var sent = await transfer.SendToGameAsync(export.Data, nickname, target, format: export.Format);
+                landed = sent.Landing;
+                return sent.Success ? null : sent.Message;
+            },
+            copyInsteadOfMove ? null : async () => await _viewModel.RunMutationAsync(s =>
+            {
+                var current = s.ExportSlot(_viewModel.BoxIndex, slot);
+                if (!current.Data.AsSpan().SequenceEqual(export.Data))
+                    return new GenerationOutcome(false, $"{nickname} changed in this save during transfer; the source was left untouched.");
+                s.ReleaseSlot(_viewModel.BoxIndex, slot);
+                return new GenerationOutcome(true, $"{nickname} moved to {target.GameLabel}.");
+            }, slot, action: SaveAction.Move) ? null : _viewModel.Status,
+            async () => landed is null
+                ? "The destination did not return a slot receipt."
+                : await transfer.UndoTransferAsync(target, [landed], $"{nickname} returned: the transfer was undone"));
         _viewModel.Status = outcome.Message;
-        if (!outcome.Success || copyInsteadOfMove) return;
-
-        await _viewModel.RunMutationAsync(s =>
-        {
-            s.ReleaseSlot(_viewModel.BoxIndex, slot);
-            return new GenerationOutcome(true, $"{nickname} moved to {target.GameLabel}.");
-        }, slot, action: SaveAction.Move);
     }
 
     /// <summary>Writes the decrypted .pk* file and hands it to Android's share sheet.</summary>

@@ -4,7 +4,12 @@ using PKForge.Engine;
 namespace PKForge.App.Services;
 
 /// <summary>Outcome of a bank-to-game or game-to-game transfer.</summary>
-public sealed record TransferOutcome(bool Success, string Message, int Box = -1, int Slot = -1, string? BackupId = null);
+public sealed record TransferOutcome(bool Success, string Message, int Box = -1, int Slot = -1,
+    string? BackupId = null, TransferLanding? Landing = null);
+
+/// <summary>The destination slot and exact exported bytes written there. The receipt lets a
+/// failed move undo only the Pokémon that this transfer placed, never a later replacement.</summary>
+public sealed record TransferLanding(string DocumentId, SlotRef Slot, byte[] Data);
 
 /// <summary>
 /// Pre-flight answer for a transfer: what the conversion will change and a legality
@@ -71,8 +76,11 @@ public sealed class TransferService(
                 ? Refusal(entityBytes, nickname, snapshot, target.GameLabel, format)
                 : $"{nickname} cannot go to {target.GameLabel}. {refusal}");
 
+        var landed = session.ExportSlot(landing.Box, landing.Slot);
         var receipt = await WriteTargetAsync(target, snapshot, session, $"{nickname} arrived from a transfer", cancellationToken).ConfigureAwait(false);
-        return new TransferOutcome(true, $"{nickname} joined {target.GameLabel} (box {landing.Box + 1}).", landing.Box, landing.Slot, receipt.BackupId);
+        return new TransferOutcome(true, $"{nickname} joined {target.GameLabel} (box {landing.Box + 1}).",
+            landing.Box, landing.Slot, receipt.BackupId,
+            new TransferLanding(target.DocumentId, landing, landed.Data.ToArray()));
     }
 
     /// <summary>
@@ -102,10 +110,10 @@ public sealed class TransferService(
 
     /// <summary>
     /// Places a whole batch in the target save's free slots (from <paramref name="startAt"/>) in
-    /// one write, or writes nothing and says which Pokémon could not enter and why. Returns the
-    /// slots the batch took, for <see cref="ReleaseFromGameAsync"/> to undo it.
+    /// one write, or writes nothing and says which Pokémon could not enter and why. Returns an
+    /// exact receipt for each slot, so a later undo cannot release a Pokémon that replaced it.
     /// </summary>
-    public async Task<(string? Refusal, IReadOnlyList<SlotRef> Landed)> SendManyToGameAsync(
+    public async Task<(string? Refusal, IReadOnlyList<TransferLanding> Landed)> SendManyToGameAsync(
         IReadOnlyList<TransferItem> items, DetectedSave target, string changeDescription,
         CancellationToken cancellationToken = default, SlotRef? startAt = null)
     {
@@ -122,21 +130,47 @@ public sealed class TransferService(
                 ? Refusal(item.Data, item.Nickname, snapshot, target.GameLabel, item.Format)
                 : $"{item.Nickname} cannot go to {target.GameLabel}. {refusal}", []);
         }
+        var landed = rooms.Select(room =>
+        {
+            var export = session.ExportSlot(room.Box, room.Slot);
+            return new TransferLanding(target.DocumentId, room, export.Data.ToArray());
+        }).ToArray();
         await WriteTargetAsync(target, snapshot, session, changeDescription, cancellationToken).ConfigureAwait(false);
-        return (null, rooms);
+        return (null, landed);
     }
 
-    /// <summary>Empties <paramref name="slots"/> of the target save in one write: the undo of
-    /// a batch that reached it but could not leave its source.</summary>
-    public async Task ReleaseFromGameAsync(DetectedSave target, IReadOnlyList<SlotRef> slots, string changeDescription,
+    /// <summary>Undo of an import whose source could not release its Pokémon. Every destination
+    /// slot is re-read and compared before any mutation; if one changed, nothing is removed.</summary>
+    public async Task<string?> UndoTransferAsync(DetectedSave target, IReadOnlyList<TransferLanding> landed,
+        string changeDescription,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(landed);
+        if (landed.Count == 0) return "The destination receipt is empty.";
+
         using var session = await OpenTargetAsync(target, cancellationToken).ConfigureAwait(false);
         var snapshot = session.Snapshot;
-        foreach (var slot in slots)
-            session.ReleaseSlot(slot.Box, slot.Slot);
+
+        var seen = new HashSet<SlotRef>();
+        foreach (var transfer in landed)
+        {
+            if (!string.Equals(transfer.DocumentId, target.DocumentId, StringComparison.Ordinal))
+                return "The destination receipt belongs to a different save.";
+            if (!seen.Add(transfer.Slot))
+                return $"The destination receipt repeats box {transfer.Slot.Box + 1}, slot {transfer.Slot.Slot + 1}.";
+            if (!snapshot.Slots.Any(slot => slot.Box == transfer.Slot.Box && slot.Slot == transfer.Slot.Slot))
+                return $"Box {transfer.Slot.Box + 1}, slot {transfer.Slot.Slot + 1} no longer exists in {target.GameLabel}.";
+
+            var current = session.ExportSlot(transfer.Slot.Box, transfer.Slot.Slot);
+            if (!current.Data.AsSpan().SequenceEqual(transfer.Data))
+                return $"Box {transfer.Slot.Box + 1}, slot {transfer.Slot.Slot + 1} changed after the transfer; it was left untouched.";
+        }
+
+        foreach (var transfer in landed)
+            session.ReleaseSlot(transfer.Slot.Box, transfer.Slot.Slot);
         await WriteTargetAsync(target, snapshot, session, changeDescription, cancellationToken).ConfigureAwait(false);
+        return null;
     }
 
     /// <summary>Writes a throwaway target session back through the safe path (validate, backup, atomic write).</summary>

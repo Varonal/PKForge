@@ -18,6 +18,7 @@ OUT="${HERE}/../../src/PKForge.App/Libraries/arm64-v8a"
 
 API=26
 TRIPLE="aarch64-linux-android"
+BUILD_DIR="build-android-ninja"
 
 mkdir -p "${WORK}" "${OUT}"
 cd "${WORK}"
@@ -28,33 +29,42 @@ if [ ! -d "mgba-${MGBA_VERSION}" ]; then
 fi
 cd "mgba-${MGBA_VERSION}"
 
-# 2. libmgba static for arm64 — the flags PokeDaisy uses (no frontends, no extras).
-cmake -B build-android \
+# 2. libmgba static for arm64: GB/GBA cores, ZIP/7z ROM support, no frontend.
+cmake -B "${BUILD_DIR}" -G Ninja \
+  -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
   -DCMAKE_TOOLCHAIN_FILE="${NDK_HOME}/build/cmake/android.toolchain.cmake" \
   -DANDROID_ABI=arm64-v8a \
   -DANDROID_PLATFORM=android-${API} \
   -DBUILD_QT=OFF -DBUILD_SDL=OFF -DBUILD_LIBRETRO=OFF \
   -DBUILD_STATIC=ON -DBUILD_SHARED=OFF \
+  -DM_CORE_GB=ON -DM_CORE_GBA=ON \
   -DUSE_FFMPEG=OFF -DUSE_DISCORD_RPC=OFF -DUSE_GDB_STUB=OFF \
-  -DUSE_SQLITE3=OFF -DUSE_MINIZIP=OFF -DUSE_PNG=OFF -DUSE_LIBZIP=OFF
+  -DUSE_SQLITE3=OFF -DUSE_MINIZIP=OFF -DUSE_PNG=OFF -DUSE_LIBZIP=OFF \
+  -DUSE_ZLIB=ON -DUSE_LZMA=ON
 # BUILD_STATIC=ON produces libmgba.a (the standard add_library output name).
-cmake --build build-android -j"$(nproc)"
+cmake --build "${BUILD_DIR}" --parallel
 
 # 3. The shim links against the static lib.
-HOST_TAG="$(uname | tr '[:upper:]' '[:lower:]')-x86_64"
-if [ "${HOST_TAG}" = "darwin-x86_64" ]; then HOST_TAG="darwin-x86_64"; fi
+case "$(uname -s)" in
+  Darwin*) HOST_TAG="darwin-x86_64" ;;
+  MINGW*|MSYS*|CYGWIN*) HOST_TAG="windows-x86_64" ;;
+  *) HOST_TAG="linux-x86_64" ;;
+esac
 CLANG="${NDK_HOME}/toolchains/llvm/prebuilt/${HOST_TAG}/bin/clang"
+if [ ! -x "${CLANG}" ] && [ -x "${CLANG}.exe" ]; then CLANG="${CLANG}.exe"; fi
 if [ ! -x "${CLANG}" ]; then
-  # Some NDK releases name it aarch64-linux-...; fall back to any prebuilt dir.
-  CLANG="$(find "${NDK_HOME}/toolchains/llvm/prebuilt" -name clang -type f | head -1)"
+  echo "Could not find the NDK clang compiler for ${HOST_TAG}." >&2
+  exit 1
 fi
 "${CLANG}" \
   --target="${TRIPLE}${API}" \
   -shared -fPIC -O2 \
+  -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384 \
+  -Wl,--no-undefined \
   -I"${WORK}/mgba-${MGBA_VERSION}/include" \
   "${HERE}/jni_bridge.c" \
-  "${WORK}/mgba-${MGBA_VERSION}/build-android/libmgba.a" \
+  "${WORK}/mgba-${MGBA_VERSION}/${BUILD_DIR}/libmgba.a" \
   -o "${OUT}/libpkforge_mgba.so" \
-  -llog -landroid
+  -llog -landroid -lGLESv3 -lz -lm
 
 echo "Built ${OUT}/libpkforge_mgba.so"

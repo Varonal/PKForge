@@ -254,7 +254,11 @@ public sealed class SecondScreenBoxPage : ContentPage
         {
             _companionHandler = (_, args) =>
             {
-                if (args.PropertyName is nameof(Services.GameCompanionStore.Live) or nameof(Services.GameCompanionStore.Current) or nameof(Services.GameCompanionStore.External))
+                if (args.PropertyName is nameof(Services.GameCompanionStore.Live)
+                    or nameof(Services.GameCompanionStore.Current)
+                    or nameof(Services.GameCompanionStore.External)
+                    or nameof(Services.GameCompanionStore.SpeedControlAvailable)
+                    or nameof(Services.GameCompanionStore.SpeedMultiplier))
                     QueueSwap();
             };
             companionStore.PropertyChanged += _companionHandler;

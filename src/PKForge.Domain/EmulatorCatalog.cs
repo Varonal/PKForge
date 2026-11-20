@@ -102,10 +102,13 @@ public static class EmulatorCatalog
     /// <summary>True when any of the emulator's packages is installed.
     /// The embedded core has no package: it is installed when the shim is packed in the APK.</summary>
     public static bool IsInstalled(EmulatorKind kind, Func<string, bool> isPackageInstalled) =>
-        kind == EmulatorKind.Embedded ? EmbeddedCoreAvailable : App(kind).PackageIds.Any(isPackageInstalled);
+        kind == EmulatorKind.Embedded ? EmbeddedCoreAvailable || EmbeddedDsCoreAvailable : App(kind).PackageIds.Any(isPackageInstalled);
 
     /// <summary>Set by the app at startup: true when libpkforge_mgba.so is packed (the embedded core runs).</summary>
     public static bool EmbeddedCoreAvailable { get; set; }
+
+    /// <summary>Set at startup when libpkforge_melonds.so is packed and loadable.</summary>
+    public static bool EmbeddedDsCoreAvailable { get; set; }
 
     /// <summary>The RetroArch core file name (without directories) for a core.</summary>
     public static string CoreFileName(RetroArchCore core) => core switch
@@ -139,7 +142,13 @@ public static class EmulatorCatalog
     /// <summary>The systems whose ROMs this emulator runs, for the launcher's expectations.</summary>
     public static string SystemsOf(EmulatorKind kind) => kind switch
     {
-        EmulatorKind.Embedded => "GB, GBC, GBA",
+        EmulatorKind.Embedded => (EmbeddedCoreAvailable, EmbeddedDsCoreAvailable) switch
+        {
+            (true, true) => "GB, GBC, GBA, Nintendo DS",
+            (true, false) => "GB, GBC, GBA",
+            (false, true) => "Nintendo DS",
+            _ => "No embedded core",
+        },
         EmulatorKind.RetroArch => "DS",
         EmulatorKind.MelonDS => "Nintendo DS",
         EmulatorKind.Azahar or EmulatorKind.CitraMmj => "Nintendo 3DS",

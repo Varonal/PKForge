@@ -1065,18 +1065,14 @@ public sealed class BankPage : ContentPage, IPadPagingHandler
             var preview = await transfer.PreviewAsync(items[0].Data, items[0].Nickname, target, format: items[0].Format);
             if (!await Services.TransferPreviewPrompt.ConfirmAsync(_hostGrid, preview, subject, target.GameLabel))
                 return;
-            IReadOnlyList<SlotRef> landed = [];
+            IReadOnlyList<Services.TransferLanding> landed = [];
             outcome = await PKForge.Engine.BankTransfers.WithdrawAsync(_bank, ids, target.GameLabel,
                 async () =>
                 {
                     (var refusal, landed) = await transfer.SendManyToGameAsync(items, target, $"{subject} arrived from the bank");
                     return refusal;
                 },
-                async () =>
-                {
-                    await transfer.ReleaseFromGameAsync(target, landed, $"{subject} went back to the bank");
-                    return null;
-                });
+                async () => await transfer.UndoTransferAsync(target, landed, $"{subject} went back to the bank"));
         }
 
         if (outcome.Success || outcome.Duplicated) FinishOrganizer(outcome.Message);
@@ -1560,6 +1556,7 @@ public sealed class BankPage : ContentPage, IPadPagingHandler
         var bytes = _bank.GetData(entry.Id);
         var nickname = entry.Info.Nickname;
         var format = entry.Info.Format;
+        var sourceRemoved = false;
 
         if (destination.Other is null)
         {
@@ -1584,12 +1581,36 @@ public sealed class BankPage : ContentPage, IPadPagingHandler
             var target = destination.Other;
             var preview = await transfer.PreviewAsync(bytes, nickname, target, format: format);
             if (!await Services.TransferPreviewPrompt.ConfirmAsync(_hostGrid, preview, nickname, target.GameLabel)) return;
-            var outcome = await transfer.SendToGameAsync(bytes, nickname, target, format: format);
-            _boxViewModel.Status = outcome.Message;
-            if (!outcome.Success) return;
+            if (keepOriginal)
+            {
+                var copied = await transfer.SendToGameAsync(bytes, nickname, target, format: format);
+                _boxViewModel.Status = copied.Message;
+                if (!copied.Success) return;
+            }
+            else
+            {
+                Services.TransferLanding? landed = null;
+                var outcome = await PKForge.Engine.BankTransfers.WithdrawAsync(_bank, [entry.Id], target.GameLabel,
+                    async () =>
+                    {
+                        var sent = await transfer.SendToGameAsync(bytes, nickname, target, format: format);
+                        landed = sent.Landing;
+                        return sent.Success ? null : sent.Message;
+                    },
+                    async () => landed is null
+                        ? "The destination did not return a slot receipt."
+                        : await transfer.UndoTransferAsync(target, [landed], $"{nickname} returned to the Bank: the transfer was undone"));
+                _boxViewModel.Status = outcome.Message;
+                if (!outcome.Success)
+                {
+                    if (outcome.Duplicated) { RefreshBoxEntries(); UpdatePreview(); }
+                    return;
+                }
+                sourceRemoved = true;
+            }
         }
 
-        if (!keepOriginal)
+        if (!keepOriginal && !sourceRemoved)
         {
             _bank.Remove(entry.Id);
             RefreshBoxEntries();
@@ -1938,9 +1959,6 @@ public sealed class BankPage : ContentPage, IPadPagingHandler
         }
         SummaryInk.Draw(canvas, $"Pokémon {version}", area.Right, y - SummaryInk.Leading(size), size, EditorPaint.Cyan, align: SKTextAlign.Right);
     }
-
-    private static SKColor ToSk(Color color) =>
-        new((byte)(color.Red * 255), (byte)(color.Green * 255), (byte)(color.Blue * 255));
 
     /// <summary>A new Pokédex entry every little while, like flipping through the dex.</summary>
     private void StartFactRotation()

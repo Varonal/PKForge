@@ -43,6 +43,8 @@ tools/**/out/
 tools/**/bin/
 tools/**/obj/
 tools/**/build/
+tools/build-melonds/android-arm64/
+tools/build-melonds/android-arm64-app/
 /pkhex/
 /PKSafe/
 src/PKForge.App/Resources/Raw/sgdb.key

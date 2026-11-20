@@ -4,3 +4,9 @@
 [submodule "external/PKHeX-Plugins"]
 	path = external/PKHeX-Plugins
 	url = https://github.com/santacrab2/PKHeX-Plugins.git
+[submodule "external/melonDS"]
+	path = external/melonDS
+	url = https://github.com/melonDS-emu/melonDS.git
+[submodule "external/azahar"]
+	path = external/azahar
+	url = https://github.com/azahar-emu/azahar.git

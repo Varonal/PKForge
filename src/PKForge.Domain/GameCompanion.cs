@@ -23,8 +23,8 @@ public sealed record GameCompanion(
 public sealed record CompanionRestorePoint(string BackupId, DateTimeOffset CreatedUtc, string? Sha256 = null);
 
 /// <summary>
-/// A live read from the running embedded game's memory (the PokéDaisy model): what
-/// the second screen refreshes while the game plays natively in-app.
+/// Companion data read from the latest valid battery-save image exposed by the
+/// embedded core. Unsaved changes in emulated RAM are not included yet.
 /// </summary>
 public sealed record LiveCompanionSnapshot(
     string GameLabel,
@@ -34,10 +34,36 @@ public sealed record LiveCompanionSnapshot(
     int DexTotal,
     int PartyCount,
     int PlaytimeHours,
-    int PlaytimeMinutes)
+    int PlaytimeMinutes,
+    IReadOnlyList<GameCompanionPartyMember>? Party = null,
+    IReadOnlyList<GameCompanionBagPocket>? Bag = null)
 {
     public int DexPercent => DexTotal == 0 ? 0 : (int)Math.Round(DexCaught * 100.0 / DexTotal);
+    public IReadOnlyList<GameCompanionPartyMember> PartyMembers => Party ?? [];
+    public IReadOnlyList<GameCompanionBagPocket> BagPockets => Bag ?? [];
 }
+
+/// <summary>A read-only party entry decoded from a GB, GBC, or GBA battery save.</summary>
+public sealed record GameCompanionPartyMember(
+    int Species,
+    string SpeciesName,
+    string Nickname,
+    int Level,
+    int CurrentHp,
+    int MaxHp,
+    string Status,
+    bool IsEgg,
+    int Form = 0,
+    bool IsShiny = false);
+
+/// <summary>A named pocket from the game's saved bag.</summary>
+public sealed record GameCompanionBagPocket(
+    string Id,
+    string Name,
+    IReadOnlyList<GameCompanionBagItem> Items);
+
+/// <summary>An item and quantity shown in a companion bag pocket.</summary>
+public sealed record GameCompanionBagItem(int Id, string Name, int Count);
 
 /// <summary>
 /// Tracks the companion: set when Play launches a game, cleared when the player
@@ -47,7 +73,7 @@ public interface IGameCompanionStore
 {
     GameCompanion? Current { get; }
 
-    /// <summary>A live snapshot from the running embedded game, when one is playing.</summary>
+    /// <summary>The latest valid battery-save snapshot from an embedded game, when available.</summary>
     LiveCompanionSnapshot? Live { get; }
 
     /// <summary>The latest snapshot polled from an external emulator's save file (US-003).</summary>
@@ -56,7 +82,7 @@ public interface IGameCompanionStore
     /// <summary>Shows this game's companion on the lower screen for the whole emulation.</summary>
     void Start(GameCompanion companion);
 
-    /// <summary>Publishes a live snapshot (embedded game running in-app).</summary>
+    /// <summary>Publishes a validated save snapshot from the embedded game session.</summary>
     void UpdateLive(LiveCompanionSnapshot snapshot);
 
     /// <summary>Clears the live snapshot (the embedded game stopped).</summary>

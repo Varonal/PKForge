@@ -22,8 +22,6 @@ public static class InfoKit
 
     public static Color TypeColor(int type) => type == TypeFacts.Stellar ? StellarColor : TypePalette.ForType(type);
 
-    private static Color TypeInk(int type) => type == TypeFacts.Stellar ? Colors.White : TypePalette.ForegroundForType(type);
-
     /// <summary>A fixed-width type plate ("FIRE", see <see cref="TypePlates"/>) so badge columns line up down a list.</summary>
     public static Border TypeBadge(int? type = null, double width = 60)
     {
