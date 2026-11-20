@@ -108,6 +108,8 @@ public static class MauiProgram
             Path.Combine(FileSystem.AppDataDirectory, "console-emulators.json")));
         builder.Services.AddSingleton<IExternalCompanionStateStore>(new Infrastructure.JsonExternalCompanionStateStore(
             Path.Combine(FileSystem.AppDataDirectory, "external-companion.json")));
+        builder.Services.AddSingleton<IPlaySessionStore>(new Infrastructure.JsonPlaySessionStore(
+            Path.Combine(FileSystem.AppDataDirectory, "play-sessions.json")));
         builder.Services.AddSingleton<IRomLibraryStore>(new Infrastructure.JsonRomLibraryStore(
             Path.Combine(FileSystem.AppDataDirectory, "rom-library.json")));
 #if ANDROID

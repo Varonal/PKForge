@@ -61,6 +61,13 @@ public static class AppStrings
     public static string PickFromLibrary => Fr ? "Choisir dans la bibliothèque" : "Pick from library";
     public static string RomMissing => Fr ? "Émulateur manquant" : "Emulator missing";
 
+    // ---- External companion: play stats ----
+    public static string SessionTime => Fr ? "Session" : "Session";
+    public static string TotalPlaytime => Fr ? "Temps de jeu total" : "Total playtime";
+    public static string SavePlaytime => Fr ? "Temps en sauvegarde" : "Save playtime";
+    public static string DexProgressLabel => Fr ? "Dex" : "Dex";
+    public static string PlaytimeHours(int hours, int minutes) => Fr ? $"{hours} h {minutes:00} min" : $"{hours}h {minutes:00}m";
+
     // ---- External companion: restore points ----
     // (RestorePointsTitle / Restore / RestoreThisPoint already exist in the "Restore points" section below.)
     public static string NoRestorePoints => Fr ? "Aucun point pour ce jeu." : "No restore point for this game.";

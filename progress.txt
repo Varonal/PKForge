@@ -105,3 +105,17 @@ null path). prd.json: US-004 passes=true. progress.txt: appended learnings." && 
   - Localisation : toutes les chaînes UI vont dans `AppStrings` avec `Fr ? "…" : "…"` ; la logique pure Domain prend un `bool french` en paramètre (la locale ne vient jamais du Domain).
   - Pour US-007 (vue companion) : le service est prêt à être consommé (ListForAsync/CreatePointAsync/RestoreAsync avec host Grid pour la confirmation) ; le snapshot externe (`IGameCompanionStore.External`) fournit le label/dex/playtime à afficher à côté.
 ---
+
+## 2026-11-20 ~08:30 - US-006
+- Machine à états **pure** `SessionClock` (`src/PKForge.Domain/PlaySession.cs`) : `Start/Pause/Resume/Close/Tick` ne prennent que des timestamps — **aucun timer, aucun polling** ; `Close` banke la durée et passe `Idle`, et après `Idle` rien ne mesure (double Close = no-op, `SessionElapsed` = 0). `PlaySessionStats` = ledger par jeu (clé = chemin ROM) avec `Total`, `SessionElapsed(now)`, `GrandTotal(now)`, `FormatDuration` (h:mm:ss). Contrat `IPlaySessionStore`.
+- Persistance par jeu : `JsonPlaySessionStore` (Infrastructure, pattern JSON atomique temp+move, keyed par clé de jeu, fichier corrompu → vide), DI sur `AppDataDirectory/play-sessions.json`.
+- Câblage lifecycle (US-004) dans `GameCompanionStore` : `StartForGameAsync` → `SessionClock.Start` + persist ; `ResumeExternalIfAny` → `SessionClock.Resume` ; `StopExternal` → `SessionClock.Close` (bank + persist) **avant** de clear l'état companion — aucun measuring en arrière-plan après Stop.
+- Données d'affichage : le snapshot externe (`IGameCompanionStore.External`, US-001/003) porte déjà `DexPercent` + `PlaytimeHours/Minutes` (playtime de la sauvegarde) ; le chrono de session vient du ledger. 5 chaînes FR/EN ajoutées à `AppStrings` (SessionTime, TotalPlaytime, SavePlaytime, DexProgressLabel, PlaytimeHours).
+- Fichiers modifiés : `PlaySession.cs` (nouveau), `JsonPlaySessionStore.cs` (nouveau), `GameCompanionStore.cs`, `MauiProgram.cs` (DI), `AppStrings.cs`, `tests/.../PlaySessionTests.cs` (nouveau, 12 tests), `prd.json` (US-006 passes=true), `progress.txt`.
+- **Apprentissages pour les itérations suivantes :**
+  - Pattern « measuring sans batterie » : **pas de timer du tout** — calculer les durées à partir des timestamps d'événements (start/close) ; `Tick` est une vue read-only. Toujours ce pattern pour toute stat de session.
+  - Clé du ledger = `RomLink.RomUri` (chemin ROM) — cohérent avec `ExternalCompanionState.RomPath` (US-004), donc Start/Resume/Stop s'alignent sur la même clé.
+  - Piège : fermer la session AVANT de clear le state persisté, sinon on perd la clé du jeu (Close keyed by `state.RomPath` lu avant `Set(null)`).
+  - `SessionElapsed` doit gérer l'horloge qui recule (now < since → zero, jamais négatif).
+  - Pour US-007 (vue companion 2ᵉ écran) : tout est prêt — `IGameCompanionStore.External` (dex/playtime snapshot) + `IPlaySessionStore.Find(romPath)` (session/total) + `ExternalRestorePointService` (points) ; reste à brancher l'affichage + README.
+---
