@@ -71,6 +71,9 @@ public sealed partial class GameCompanionStore : ObservableObject, IGameCompanio
                 ?.Set(new ExternalCompanionState(link.RomUri, link.Emulator, link.GameLabel, string.Empty, DateTimeOffset.UtcNow));
             services?.GetService<ExternalSaveMonitor>()
                 ?.Start(link.RomUri, link.Emulator, link.GameLabel);
+            // US-006: the play-time session starts with the external launch.
+            if (services?.GetService<IPlaySessionStore>() is { } sessions)
+                sessions.Set(SessionClock.Start(sessions.Find(link.RomUri), link.RomUri, link.GameLabel, DateTimeOffset.UtcNow));
         }
         catch (Exception error)
         {
@@ -91,6 +94,8 @@ public sealed partial class GameCompanionStore : ObservableObject, IGameCompanio
         try
         {
             services?.GetService<ExternalSaveMonitor>()?.Start(state.RomPath, state.Emulator, state.GameLabel, state.GameCode);
+            if (services?.GetService<IPlaySessionStore>() is { } sessions)
+                sessions.Set(SessionClock.Resume(sessions.Find(state.RomPath), DateTimeOffset.UtcNow));
         }
         catch (Exception error)
         {
@@ -106,8 +111,16 @@ public sealed partial class GameCompanionStore : ObservableObject, IGameCompanio
     {
         try
         {
-            IPlatformApplication.Current?.Services.GetService<ExternalSaveMonitor>()?.Stop();
-            IPlatformApplication.Current?.Services.GetService<IExternalCompanionStateStore>()?.Set(null);
+            var services = IPlatformApplication.Current?.Services;
+            services.GetService<ExternalSaveMonitor>()?.Stop();
+            // US-006: close the play session of the game we were watching (keyed by its ROM
+            // path) before clearing the persisted state — after Close, nothing measures.
+            if (services?.GetService<IExternalCompanionStateStore>()?.Current is { } state
+                && services.GetService<IPlaySessionStore>() is { } sessions)
+            {
+                sessions.Set(SessionClock.Close(sessions.Find(state.RomPath), DateTimeOffset.UtcNow));
+            }
+            services?.GetService<IExternalCompanionStateStore>()?.Set(null);
         }
         catch (Exception error)
         {

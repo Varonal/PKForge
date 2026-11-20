@@ -93,8 +93,8 @@
         "dotnet build src/PKForge.App/PKForge.App.csproj -f net10.0-android passe et tests Domain passent"
       ],
       "priority": 6,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Pure SessionClock state machine (Start/Pause/Resume/Close/Tick on timestamps only - no timer, no polling, nothing measures after Close/Idle), PlaySessionStats ledger per game key (ROM path) with SessionElapsed/GrandTotal/FormatDuration(h:mm:ss). Persisted per game via IPlaySessionStore + JsonPlaySessionStore (atomic JSON, AppDataDirectory/play-sessions.json). Wired into the US-004 lifecycle: StartForGameAsync opens the session, ResumeExternalIfAny resumes it, StopExternal closes+banks it before clearing the companion state. Snapshot display data (DexPercent, save playtime) already rides on IGameCompanionStore.External (US-001/003); 5 FR/EN strings added. 12 tests (clock transitions, double-close no-op, per-game accumulation, format, store roundtrip/reopen/corrupt). CI: tests Release + APK build. Manual on device (US-007 shows it): while a DS game runs externally, the companion's session chrono ticks; on return to PKForge the total is banked and persists across app restarts; no CPU/timer activity after Stop."
     },
     {
       "id": "US-007",
