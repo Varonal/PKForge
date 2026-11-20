@@ -60,6 +60,11 @@ hors-ligne, sur la console elle-même.
 - [x] **Companion live (modèle PokéDaisy)** : pendant qu'un jeu GBA tourne dans
       l'app, le second écran lit la mémoire de la console en direct — dex, équipe,
       temps de jeu — rafraîchi chaque seconde
+- [x] **Companion de jeu externe (modèle polling .sav)** : pendant qu'un jeu tourne dans un
+      émulateur tiers (melonDS, RetroArch DS…), le second écran surveille le fichier de
+      sauvegarde écrit par l'émulateur (stat toutes les 5 s, relecture après flush stable),
+      le parse et affiche dex, équipe, temps de sauvegarde, chrono de session et points de
+      restauration — sans jamais toucher au premier écran ni à la sauvegarde en direct
 - [x] Trophées maison par scan de sauvegardes + trophées manuels
 - [x] RetroAchievements (Gen 1-5) avec cache hors-ligne
 - [x] Watcher automatique + notifications de déblocage
@@ -67,8 +72,6 @@ hors-ligne, sur la console elle-même.
 - [x] Interface française par défaut (anglais disponible)
 
 ### 🚧 En cours
-- [ ] **Companion de jeu externe** : le second écran reste vivant pendant l'émulation
-      externe (émulateurs tiers) — stats, Pokédex, points de restauration
 - [ ] **Intégration des mods** : Radical Red, Unbound, GS Chronicles… détectés et
       lancés depuis l'app avec leurs réglages dédiés
 - [ ] Traduction française complète des surfaces restantes (box browser, éditeurs)

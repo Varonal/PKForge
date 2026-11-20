@@ -109,8 +109,8 @@
         "AGENTS.md et progress.txt contiennent les apprentissages réutilisables de la run"
       ],
       "priority": 7,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Finalization. Companion view: GameCompanionView.ShowExternal(ExternalCompanionSnapshot, PlaySessionStats?) renders dex/party/save-playtime/session-chrono/total on the lower screen; SecondScreenBoxPage.SwapCoreAsync feeds it from IGameCompanionStore.External + IExternalCompanionStateStore.RomPath + IPlaySessionStore, and reacts to the External PropertyChanged — the overlay lives only on the second screen, never over the emulator's first screen, and is read-only. README: 'Companion de jeu externe (modèle polling .sav)' moved En cours -> Fait. AGENTS.md created at repo root with the run's reusable patterns. All UI strings FR-default/EN in AppStrings. Full CI: Domain tests Release + App net10.0-android build. Manual on device: launch a DS game in melonDS -> lower screen shows the external companion and refreshes within ~10 s of an in-game save, first screen untouched; back in PKForge -> companion stops, trophy scan runs."
     }
   ]
 }

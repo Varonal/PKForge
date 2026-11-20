@@ -28,6 +28,12 @@ public sealed class GameCompanionView : VerticalStackLayout
         HorizontalTextAlignment = TextAlignment.Center,
         IsVisible = false,
     };
+    private readonly Label _external = new()
+    {
+        FontFamily = DsChrome.PixelFont, FontSize = 11, TextColor = UiTokens.Cyan,
+        HorizontalTextAlignment = TextAlignment.Center,
+        IsVisible = false,
+    };
     private readonly VerticalStackLayout _points = new() { Spacing = 3 };
 
     public GameCompanionView()
@@ -40,6 +46,7 @@ public sealed class GameCompanionView : VerticalStackLayout
         Children.Add(_title);
         Children.Add(_dex);
         Children.Add(_live);
+        Children.Add(_external);
         Children.Add(new Label
         {
             Text = AppStrings.Fr ? "Points de restauration" : "Restore points",
@@ -58,6 +65,7 @@ public sealed class GameCompanionView : VerticalStackLayout
             : $"Pokédex: {companion.DexCaught}/{companion.DexTotal} caught · {companion.DexPercent}%";
         _points.Children.Clear();
         _live.IsVisible = false;
+        _external.IsVisible = false;
         if (companion.RestorePoints.Count == 0)
         {
             _points.Children.Add(new Label
@@ -87,5 +95,32 @@ public sealed class GameCompanionView : VerticalStackLayout
             ? $"En direct : dex {live.DexCaught}/{live.DexTotal} · équipe {live.PartyCount}/6 · {live.PlaytimeHours}h{live.PlaytimeMinutes:D2}"
             : $"Live: dex {live.DexCaught}/{live.DexTotal} · party {live.PartyCount}/6 · {live.PlaytimeHours}h{live.PlaytimeMinutes:D2}";
         _live.IsVisible = true;
+    }
+
+    /// <summary>
+    /// Overlays a snapshot polled from the external emulator's save file (US-003), with the
+    /// session chrono and the save's own playtime (US-006). Read-only: the companion never
+    /// touches the save the emulator holds open, and it lives on the lower screen only.
+    /// </summary>
+    public void ShowExternal(ExternalCompanionSnapshot external, PlaySessionStats? session)
+    {
+        var dex = AppStrings.Fr
+            ? $"{AppStrings.DexProgressLabel} {external.DexCaught}/{external.DexTotal} · {external.DexPercent}%"
+            : $"{AppStrings.DexProgressLabel} {external.DexCaught}/{external.DexTotal} · {external.DexPercent}%";
+        var save = AppStrings.PlaytimeHours(external.PlaytimeHours, external.PlaytimeMinutes);
+        var line = AppStrings.Fr
+            ? $"{dex} · équipe {external.PartyCount}/6 · {AppStrings.SavePlaytime} {save}"
+            : $"{dex} · party {external.PartyCount}/6 · {AppStrings.SavePlaytime} {save}";
+        if (session is not null)
+        {
+            var now = DateTimeOffset.UtcNow;
+            var sessionLine = PlaySessionStats.FormatDuration(session.SessionElapsed(now));
+            var totalLine = PlaySessionStats.FormatDuration(session.GrandTotal(now));
+            line += AppStrings.Fr
+                ? $" · {AppStrings.SessionTime} {sessionLine} · {AppStrings.TotalPlaytime} {totalLine}"
+                : $" · {AppStrings.SessionTime} {sessionLine} · {AppStrings.TotalPlaytime} {totalLine}";
+        }
+        _external.Text = line;
+        _external.IsVisible = true;
     }
 }
