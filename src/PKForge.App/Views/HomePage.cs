@@ -82,32 +82,41 @@ public sealed class HomePage : ContentPage, IPadHandler
         Grid.SetRow(_shelf, 1);
         BlockNativeFocus(_shelf);
 
-        // The three destinations as PKSM tiles with bundled pixel icons.
+        // Home destinations as DS-style tiles with bundled pixel icons.
         var bank = new DsCard("bank", AppStrings.Bank) { Tapped = () => _ = PushAsync<BankPage>() };
         var autopilot = new DsCard("pokedex", AppStrings.DexAutopilot) { Tapped = () => _ = OpenAutopilotAsync() };
         var park = new DsCard("park", AppStrings.Pokepark) { Tapped = () => _ = PushParkAsync() };
         var events = new DsCard("events", AppStrings.Events) { Tapped = () => _ = ShowEventsMenuAsync() };
         var emulators = new DsCard("retroarch", AppStrings.EmulatorsTitle) { Tapped = () => _ = PushAsync<EmulatorsPage>() };
         var library = new DsCard("platform-gba", "Library") { Tapped = () => _ = PushAsync<RomLibraryPage>() };
+        var museum = new DsCard("pokedex", AppStrings.MuseumTitle) { Tapped = () => _ = PushAsync<MuseumPage>() };
         var trophies = new DsCard("ribbons", "Trophies") { Tapped = () => _ = PushAsync<TrophiesPage>() };
         var awards = new DsCard("credits", "Awards") { Tapped = () => _ = PushAsync<RetroAchievementsPage>() };
         var settings = new DsCard("settings", AppStrings.Settings) { Tapped = () => _ = ShowSettingsAsync() };
-        _cards = [bank, autopilot, park, events, emulators, library, trophies, awards, settings];
+        _cards = [bank, autopilot, park, events, museum, emulators, library, trophies, awards, settings];
         foreach (var card in _cards) BlockNativeFocus(card);
         var cards = new Grid
         {
             ColumnSpacing = 10,
-            ColumnDefinitions = [new(GridLength.Star), new(GridLength.Star), new(GridLength.Star), new(GridLength.Star), new(GridLength.Star), new(GridLength.Star), new(GridLength.Star), new(GridLength.Star), new(GridLength.Star)],
-            Children = { bank, autopilot, park, events, emulators, library, trophies, awards, settings },
+            RowSpacing = 4,
+            ColumnDefinitions = [new(GridLength.Star), new(GridLength.Star), new(GridLength.Star), new(GridLength.Star), new(GridLength.Star)],
+            RowDefinitions = [new(GridLength.Auto), new(GridLength.Auto)],
+            Children = { bank, autopilot, park, events, museum, emulators, library, trophies, awards, settings },
         };
         Grid.SetColumn(autopilot, 1);
         Grid.SetColumn(park, 2);
         Grid.SetColumn(events, 3);
-        Grid.SetColumn(emulators, 4);
-        Grid.SetColumn(library, 5);
-        Grid.SetColumn(trophies, 6);
-        Grid.SetColumn(awards, 7);
-        Grid.SetColumn(settings, 8);
+        Grid.SetColumn(museum, 4);
+        Grid.SetColumn(emulators, 0);
+        Grid.SetRow(emulators, 1);
+        Grid.SetColumn(library, 1);
+        Grid.SetRow(library, 1);
+        Grid.SetColumn(trophies, 2);
+        Grid.SetRow(trophies, 1);
+        Grid.SetColumn(awards, 3);
+        Grid.SetRow(awards, 1);
+        Grid.SetColumn(settings, 4);
+        Grid.SetRow(settings, 1);
 
         var body = new Grid
         {
@@ -396,9 +405,14 @@ public sealed class HomePage : ContentPage, IPadHandler
         switch (button)
         {
             case PadButton.Down when _zone == 0: _zone = 1; return FocusCard(0);
-            case PadButton.Up when _zone == 1: _zone = 0; ClearCardFocus(); return true;
-            case PadButton.Left: return _zone == 0 ? MoveShelf(-1) : FocusCard(_cardIndex - 1);
-            case PadButton.Right: return _zone == 0 ? MoveShelf(1) : FocusCard(_cardIndex + 1);
+            case PadButton.Up when _zone == 1:
+                if (_cardIndex >= 5) return FocusCard(_cardIndex - 5);
+                _zone = 0;
+                ClearCardFocus();
+                return true;
+            case PadButton.Down when _zone == 1: return FocusCard(_cardIndex + 5);
+            case PadButton.Left: return _zone == 0 ? MoveShelf(-1) : MoveCard(-1);
+            case PadButton.Right: return _zone == 0 ? MoveShelf(1) : MoveCard(1);
             case PadButton.A:
                 if (_zone == 1) { _cards[_cardIndex].Tapped?.Invoke(); return true; }
                 return OpenShelfSelection();
@@ -415,13 +429,21 @@ public sealed class HomePage : ContentPage, IPadHandler
         }
     }
 
-    /// <summary>Move the cursor among the Bank/Events/Settings cards (the second focus zone).</summary>
+    /// <summary>Move the cursor among the Home destination cards (the second focus zone).</summary>
     private bool FocusCard(int index)
     {
         if (_cards.Length == 0) return false;
         _cardIndex = Math.Clamp(index, 0, _cards.Length - 1);
         for (var i = 0; i < _cards.Length; i++) _cards[i].Selected = i == _cardIndex;
         return true;
+    }
+
+    private bool MoveCard(int delta)
+    {
+        if (_cards.Length == 0) return false;
+        var rowStart = _cardIndex / 5 * 5;
+        var rowEnd = Math.Min(rowStart + 4, _cards.Length - 1);
+        return FocusCard(Math.Clamp(_cardIndex + delta, rowStart, rowEnd));
     }
 
     private void ClearCardFocus()

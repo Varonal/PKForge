@@ -1,17 +1,13 @@
 namespace PKForge.Domain;
 
 /// <summary>
-/// The live, in-emulator companion (the PokéDaisy model): the GBA's save RAM is read
-/// straight out of the running core, so the second screen tracks the game as it
-/// plays — dex progress, party count, playtime — without waiting for a save flush.
-/// All offsets are relative to the SRAM/Flash bus base 0x0E000000, in the sector
-/// layout PKHeX's SAV3 parses (4 KiB sectors, sector ID at 0xFF4, active slot first).
+/// Builds companion snapshots from a captured Generation 3 battery-save image.
+/// This reports the last persisted save state; it does not expose unsaved changes
+/// held in the game's emulated RAM. Offsets use the sector layout parsed by SAV3
+/// (4 KiB sectors, sector ID at 0xFF4, active slot first).
 /// </summary>
 public static class LiveGbaCompanion
 {
-    /// <summary>The GBA cartridge save region (SRAM 64 KiB, Flash 128 KiB, mirrored at 0x0F000000).</summary>
-    public const uint SaveBase = 0x0E000000;
-
     private const int SectorSize = 0x1000;
     private const int MainSectors = 14;
     private const int MainSize = MainSectors * SectorSize;
@@ -22,32 +18,11 @@ public static class LiveGbaCompanion
     private const int CaughtOffset = 0x18 + 0x10;
     private const int SeenOffset = 0x18 + 0x44;
 
-    /// <summary>One live snapshot of the running game's companion data.</summary>
-    public sealed record LiveCompanionSnapshot(
-        string GameTitle,
-        string GameCode,
-        int DexCaught,
-        int DexSeen,
-        int DexTotal,
-        int PartyCount,
-        int PlaytimeHours,
-        int PlaytimeMinutes)
+    /// <summary>Reads lightweight counters from a captured pair of save slots.</summary>
+    public static LiveCompanionSnapshot? Read(string gameTitle, string gameCode, byte[] both, int maxSpeciesId)
     {
-        public int DexPercent => DexTotal == 0 ? 0 : (int)Math.Round(DexCaught * 100.0 / DexTotal);
-    }
-
-    /// <summary>
-    /// Reads the active save slot out of the core's memory and measures it.
-    /// Returns null when the memory is unreadable or no small sector is found.
-    /// </summary>
-    public static LiveCompanionSnapshot? Read(IEmbeddedCore core, int maxSpeciesId)
-    {
-        ArgumentNullException.ThrowIfNull(core);
-        if (!core.IsRunning || maxSpeciesId <= 0) return null;
-
-        // Read both 128 KiB slots when the cart has them; slot 0 always exists.
-        var both = new byte[MainSize * 2];
-        if (!core.ReadBytes(SaveBase, both)) return null;
+        ArgumentNullException.ThrowIfNull(both);
+        if (maxSpeciesId <= 0 || both.Length < MainSize * 2) return null;
 
         var active = ActiveSlot(both);
         var baseOffset = active * MainSize;
@@ -72,7 +47,7 @@ public static class LiveGbaCompanion
         var minutes = small.Length > 0x0D ? small[0x0D] : (byte)0;
 
         return new LiveCompanionSnapshot(
-            core.GameTitle, core.GameCode, caught, seen, maxSpeciesId,
+            gameTitle, gameCode, caught, seen, maxSpeciesId,
             partyCount, hours, minutes);
     }
 

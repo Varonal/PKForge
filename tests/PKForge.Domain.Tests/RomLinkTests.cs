@@ -3,17 +3,19 @@ using Xunit;
 
 namespace PKForge.Domain.Tests;
 
+[Collection(EmulatorCatalogCollection.Name)]
 public sealed class RomLinkRulesTests
 {
     [Theory]
     [InlineData(1, "Pokemon - Red Version.gb", EmulatorKind.Embedded)]
     [InlineData(2, "Pokemon - Crystal Version.gbc", EmulatorKind.Embedded)]
-    [InlineData(2, "Pokemon - Crystal Version.zip", EmulatorKind.Embedded)]
     [InlineData(3, "Pokemon - Emerald Version.gba", EmulatorKind.Embedded)]
-    [InlineData(4, "Pokemon - Diamond Version.nds", EmulatorKind.MelonDS)]
-    [InlineData(5, "Pokemon - Black Version 2.nds", EmulatorKind.MelonDS)]
+    [InlineData(4, "Pokemon - Diamond Version.nds", EmulatorKind.Embedded)]
+    [InlineData(4, "Pokemon - Diamond Version.zip", EmulatorKind.Embedded)]
+    [InlineData(5, "Pokemon - Black Version 2.nds", EmulatorKind.Embedded)]
     public void PrefersTheEmulatorThatRunsTheGeneration(int generation, string rom, EmulatorKind first)
     {
+        using var cores = new EmbeddedCoreAvailabilityScope(mgba: true, melonDs: true);
         var emulators = RomLinkRules.EmulatorsForRom(generation, rom);
         Assert.NotEmpty(emulators);
         Assert.Equal(first, emulators[0]);
@@ -25,13 +27,28 @@ public sealed class RomLinkRulesTests
     [InlineData(3, "Pokemon - Emerald Version.gba")]
     public void GenOneToThreeRomsHaveEmbeddedAsTheirOnlyRoute(int generation, string rom)
     {
+        using var cores = new EmbeddedCoreAvailabilityScope(mgba: true, melonDs: true);
         // Gen 1-3 ROMs can never be handed to an external emulator.
         Assert.Equal([EmulatorKind.Embedded], RomLinkRules.EmulatorsForRom(generation, rom));
+    }
+
+    [Fact]
+    public void IntegratedRomsNeedTheirNativeCoreToBePackaged()
+    {
+        using var cores = new EmbeddedCoreAvailabilityScope(mgba: false, melonDs: false);
+
+        Assert.Empty(RomLinkRules.EmulatorsForRom(3, "Pokemon - Emerald Version.gba"));
+        Assert.Empty(RomLinkRules.EmulatorsForRom(4, "Pokemon - Diamond Version.nds"));
+        EmulatorCatalog.EmbeddedCoreAvailable = true;
+        Assert.Equal([EmulatorKind.Embedded], RomLinkRules.EmulatorsForRom(3, "Pokemon - Emerald Version.gba"));
+        EmulatorCatalog.EmbeddedDsCoreAvailable = true;
+        Assert.Equal([EmulatorKind.Embedded], RomLinkRules.EmulatorsForRom(4, "Pokemon - Diamond Version.nds"));
     }
 
     [Theory]
     [InlineData(3, "Pokemon - Emerald Version.nds")]     // a GBA game on a DS file
     [InlineData(4, "Pokemon - Diamond Version.gba")]     // a DS game on a GBA file
+    [InlineData(2, "Pokemon - Crystal Version.zip")]    // GB/GBC archives are not loaded by the core
     [InlineData(1, "Pokemon - Red Version.3ds")]         // nothing runnable
     [InlineData(6, "Pokemon - X.3ds")]                   // Gen 6 has no launch route yet
     [InlineData(0, "Whatever.gb")]                        // unknown generation

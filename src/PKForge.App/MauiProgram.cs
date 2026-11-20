@@ -22,6 +22,7 @@ public static class MauiProgram
         Views.CapsuleSkin.Register();
         // Probe the embedded mGBA shim once: GB/GBC/GBA play in-app only when it is packed.
         Domain.EmulatorCatalog.EmbeddedCoreAvailable = Platforms.Android.EmbeddedGameSession.IsAvailable;
+        Domain.EmulatorCatalog.EmbeddedDsCoreAvailable = Platforms.Android.NintendoDsGameSession.IsAvailable;
 #endif
         builder.UseMauiApp<App>().UseSkiaSharp()
             .ConfigureFonts(fonts =>
@@ -102,7 +103,6 @@ public static class MauiProgram
         builder.Services.AddSingleton<Services.GameCompanionStore>();
         builder.Services.AddSingleton<Domain.IGameCompanionStore>(sp => sp.GetRequiredService<Services.GameCompanionStore>());
         builder.Services.AddSingleton<Services.ExternalSaveMonitor>();
-        builder.Services.AddSingleton<Services.ExternalRestorePointService>();
         builder.Services.AddSingleton<Services.TrophyWatcherService>();
         builder.Services.AddSingleton<IConsoleEmulatorStore>(new Infrastructure.JsonConsoleEmulatorStore(
             Path.Combine(FileSystem.AppDataDirectory, "console-emulators.json")));
@@ -117,7 +117,9 @@ public static class MauiProgram
         builder.Services.AddSingleton<Platforms.Android.MusicPlayer>();
         builder.Services.AddSingleton<IMusicPlayer>(sp => sp.GetRequiredService<Platforms.Android.MusicPlayer>());
         builder.Services.AddSingleton<IDocumentPicker, AndroidDocumentPicker>();
-        builder.Services.AddSingleton<ISecondaryDisplayHost, AndroidSecondaryDisplayHost>();
+        builder.Services.AddSingleton<AndroidSecondaryDisplayHost>();
+        builder.Services.AddSingleton<ISecondaryDisplayHost>(sp => sp.GetRequiredService<AndroidSecondaryDisplayHost>());
+        builder.Services.AddSingleton<Services.IDualScreenGameDisplayHost>(sp => sp.GetRequiredService<AndroidSecondaryDisplayHost>());
         builder.Services.AddSingleton<IFolderPicker, AndroidFolderPicker>();
         builder.Services.AddSingleton<IFolderFileAccess, AndroidFolderFileAccess>();
         builder.Services.AddSingleton<IEmulatorDetectionService, AndroidEmulatorScanner>();
@@ -138,6 +140,7 @@ public static class MauiProgram
         builder.Services.AddTransient<EmulatorsPage>();
         builder.Services.AddTransient<RetroAchievementsPage>();
         builder.Services.AddTransient<TrophiesPage>();
+        builder.Services.AddTransient<MuseumPage>();
         builder.Services.AddTransient<RomLibraryPage>();
         App.Trace("builder.Build()");
         return builder.Build();

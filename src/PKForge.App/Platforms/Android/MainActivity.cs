@@ -4,6 +4,7 @@ using Android.Hardware.Display;
 using Android.OS;
 using Android.Content;
 using Android.Views;
+using PKForge.App.Platforms.Android;
 using PKForge.Domain;
 
 [assembly: UsesPermission(Android.Manifest.Permission.Vibrate)]
@@ -89,9 +90,7 @@ public sealed class MainActivity : MauiAppCompatActivity
     {
         // A Presentation owns a separate window, so Android does not reliably hide it
         // when the launcher backgrounds the main activity (notably on the AYN Thor).
-        StopHatRepeat();
-        StopKeyRepeat();
-        _hatDirection = null;
+        ReleaseNavigationInputs();
         SecondaryDisplayHost()?.SuspendForActivityPause();
         base.OnPause();
     }
@@ -112,9 +111,7 @@ public sealed class MainActivity : MauiAppCompatActivity
     public override void OnConfigurationChanged(Android.Content.Res.Configuration newConfig)
     {
         base.OnConfigurationChanged(newConfig);
-        StopHatRepeat();
-        StopKeyRepeat();
-        _hatDirection = null;
+        ReleaseNavigationInputs();
     }
 
     protected override void OnNewIntent(Intent? intent)
@@ -257,8 +254,11 @@ public sealed class MainActivity : MauiAppCompatActivity
             var direction = HatDirection(e);
             if (direction != _hatDirection)
             {
+                var previousDirection = _hatDirection;
                 StopHatRepeat();
                 _hatDirection = direction;
+                if (previousDirection is { } released)
+                    DispatchButtonRelease(released);
                 if (direction is { } button)
                 {
                     DispatchHat(button, haptic: true);
@@ -287,6 +287,26 @@ public sealed class MainActivity : MauiAppCompatActivity
         if (_hatRepeatRunnable is null) return;
         _hatRepeatHandler.RemoveCallbacks(_hatRepeatRunnable);
         _hatRepeatRunnable = null;
+    }
+
+    /// <summary>
+    /// Axis hats report both deflection and return to neutral. The routed game input is
+    /// a held-button bitmask, so every hat transition must include the matching release.
+    /// </summary>
+    private static void DispatchButtonRelease(Services.PadButton button) =>
+        IPlatformApplication.Current?.Services.GetService<Services.GamepadRouter>()?.DispatchRelease(button);
+
+    /// <summary>Clear held navigation buttons when focus or the connected controller changes.</summary>
+    private void ReleaseNavigationInputs()
+    {
+        var hatDirection = _hatDirection;
+        var keyDirection = _keyRepeatButton;
+        StopHatRepeat();
+        StopKeyRepeat();
+        _hatDirection = null;
+
+        if (hatDirection is { } hat) DispatchButtonRelease(hat);
+        if (keyDirection is { } key && key != hatDirection) DispatchButtonRelease(key);
     }
 
     private static void DispatchHat(Services.PadButton button, bool haptic)
@@ -361,14 +381,16 @@ public sealed class MainActivity : MauiAppCompatActivity
 /// The AYN Thor does NOT tag its bottom screen as a presentation-category display,
 /// so detection falls back to GetDisplays()[1] when the category query is empty.
 /// </summary>
-public sealed class AndroidSecondaryDisplayHost(IServiceProvider services) : ISecondaryDisplayHost
+public sealed class AndroidSecondaryDisplayHost(IServiceProvider services) : ISecondaryDisplayHost, Services.IDualScreenGameDisplayHost
 {
     private readonly object _showGate = new();
     private PagePresentation? _presentation;
     private ContentPage? _page;
+    private IEmbeddedGameSession? _activeDsSession;
     private bool _resumeAfterActivityPause;
 
     public bool IsAvailable => Services.SecondScreenMode.Allowed && ResolveDisplay() is not null;
+    public event Action? DisplayContentChanged;
 
     /// <summary>True on a dual-screen handheld when PKForge runs on a panel other than the main one.</summary>
     internal static bool LaunchedOnLowerScreen(Activity activity) =>
@@ -379,33 +401,95 @@ public sealed class AndroidSecondaryDisplayHost(IServiceProvider services) : ISe
     public ValueTask ShowAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var display = ResolveDisplay() ?? throw new InvalidOperationException("No secondary display is available.");
-        var activity = Platform.CurrentActivity ?? throw new InvalidOperationException("No foreground Android activity is available.");
+        ShowCurrentPage(allowMissingDisplay: _activeDsSession is not null);
+        return ValueTask.CompletedTask;
+    }
 
+    public Task<bool> ShowNintendoDsBottomScreenAsync(
+        IEmbeddedGameSession session,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!session.IsNintendoDs) return Task.FromResult(false);
+
+        lock (_showGate) _activeDsSession = session;
+        var shown = ShowCurrentPage(allowMissingDisplay: true);
+        return Task.FromResult(shown && IsShowingNintendoDsBottomScreen(session));
+    }
+
+    public bool IsShowingNintendoDsBottomScreen(IEmbeddedGameSession session)
+    {
+        lock (_showGate)
+            return ReferenceEquals(_activeDsSession, session)
+                && _page is Views.NintendoDsSecondaryScreenPage gamePage
+                && ReferenceEquals(gamePage.Session, session)
+                && _presentation is { IsShowing: true };
+    }
+
+    public ValueTask RestoreDefaultScreenAsync(
+        IEmbeddedGameSession session,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        cancellationToken.ThrowIfCancellationRequested();
         lock (_showGate)
         {
-            if (_presentation is { IsShowing: true })
+            if (!ReferenceEquals(_activeDsSession, session)) return ValueTask.CompletedTask;
+            _activeDsSession = null;
+            if (_page is Views.NintendoDsSecondaryScreenPage)
+                DismissPresentationLocked();
+        }
+
+        DisplayContentChanged?.Invoke();
+        if (IsAvailable) return ShowAsync(cancellationToken);
+        return ValueTask.CompletedTask;
+    }
+
+    /// <summary>Creates or replaces the presentation for its current owner. DS output
+    /// deliberately ignores the app's companion visibility preference: it is the console's
+    /// second framebuffer, not optional companion content.</summary>
+    private bool ShowCurrentPage(bool allowMissingDisplay)
+    {
+        var display = ResolveDisplay();
+        if (display is null)
+        {
+            lock (_showGate)
             {
-                if (_page is Views.PokeparkJournalPage journalPage)
-                    _ = journalPage.RefreshAsync(cancellationToken);
-                return ValueTask.CompletedTask;
+                if (_activeDsSession is not null && _presentation is not null)
+                    DismissPresentationLocked();
+            }
+            DisplayContentChanged?.Invoke();
+            if (!allowMissingDisplay) throw new InvalidOperationException("No secondary display is available.");
+            return false;
+        }
+
+        var activity = Platform.CurrentActivity
+            ?? throw new InvalidOperationException("No foreground Android activity is available.");
+        var shown = false;
+        lock (_showGate)
+        {
+            var gameSession = _activeDsSession;
+            var isCurrentPage = gameSession is null
+                ? _page is not Views.NintendoDsSecondaryScreenPage
+                : _page is Views.NintendoDsSecondaryScreenPage gamePage
+                    && ReferenceEquals(gamePage.Session, gameSession);
+            if (_presentation is { IsShowing: true } && isCurrentPage)
+            {
+                if (gameSession is null && _page is Views.PokeparkJournalPage journalPage)
+                    _ = journalPage.RefreshAsync();
+                return true;
             }
 
             // A dismissed presentation (SAF picker, sleep) cannot be reshown;
-            // rebuild the page and presentation as one serialized operation.
-            _presentation?.Dismiss();
-            if (_page is Views.SecondScreenBoxPage boxPage)
-                boxPage.Cleanup();
-            else if (_page is Views.PokeparkJournalPage journalPage)
-                journalPage.Cleanup();
-            _presentation = null;
-            _page = null;
-            if (!Services.SecondScreenMode.Allowed) return ValueTask.CompletedTask;
+            // rebuild its page and presentation as one serialized operation.
+            DismissPresentationLocked();
+            if (gameSession is null && !Services.SecondScreenMode.Allowed)
+                return false;
 
-            // Built and shown as locals: a display Android refuses (a virtual or removed one
-            // raises BadToken/InvalidDisplay) leaves nothing half-built, and PKForge carries
-            // on with one screen instead of crashing.
-            var page = services.GetRequiredService<Views.SecondScreenBoxPage>();
+            ContentPage page = gameSession is null
+                ? services.GetRequiredService<Views.SecondScreenBoxPage>()
+                : new Views.NintendoDsSecondaryScreenPage(gameSession);
             var presentation = new PagePresentation(activity, display, page, services);
             try
             {
@@ -413,15 +497,23 @@ public sealed class AndroidSecondaryDisplayHost(IServiceProvider services) : ISe
             }
             catch (Exception error) when (error is WindowManagerBadTokenException or WindowManagerInvalidDisplayException or Java.Lang.Exception)
             {
-                page.Cleanup();
-                Services.SecondScreenMode.DisableForSession($"display {display.DisplayId} ({display.Name}) refused the lower screen", error);
-                return ValueTask.CompletedTask;
+                CleanupPage(page);
+                if (gameSession is null)
+                    Services.SecondScreenMode.DisableForSession($"display {display.DisplayId} ({display.Name}) refused the lower screen", error);
+                else
+                    Services.AppLog.Warn("second", $"DS bottom screen could not be shown on display {display.DisplayId} ({display.Name}); keeping both screens on the main display: {error.Message}");
+                DisplayContentChanged?.Invoke();
+                return false;
             }
             _page = page;
             _presentation = presentation;
-            Services.AppLog.Info("second", $"Lower screen on display {display.DisplayId} ({display.Name}, flags 0x{(int)display.Flags:X})");
+            shown = true;
+            Services.AppLog.Info("second", gameSession is null
+                ? $"Companion screen on display {display.DisplayId} ({display.Name}, flags 0x{(int)display.Flags:X})"
+                : $"Nintendo DS bottom screen on display {display.DisplayId} ({display.Name}, flags 0x{(int)display.Flags:X})");
         }
-        return ValueTask.CompletedTask;
+        if (shown) DisplayContentChanged?.Invoke();
+        return shown;
     }
 
     public ValueTask ShowPokeparkJournalAsync(CancellationToken cancellationToken = default)
@@ -458,7 +550,12 @@ public sealed class AndroidSecondaryDisplayHost(IServiceProvider services) : ISe
     public ValueTask DismissAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        Dismiss();
+        lock (_showGate)
+        {
+            _activeDsSession = null;
+            DismissPresentationLocked();
+        }
+        DisplayContentChanged?.Invoke();
         _resumeAfterActivityPause = false;
         StopWaitingForDisplay();
         return ValueTask.CompletedTask;
@@ -519,14 +616,33 @@ public sealed class AndroidSecondaryDisplayHost(IServiceProvider services) : ISe
     private void Dismiss()
     {
         lock (_showGate)
+            DismissPresentationLocked();
+        DisplayContentChanged?.Invoke();
+    }
+
+    /// <summary>Called while holding _showGate. The active DS session intentionally
+    /// survives activity pause so Android can recreate its bottom-screen surface on wake.</summary>
+    private void DismissPresentationLocked()
+    {
+        _presentation?.Dismiss();
+        _presentation = null;
+        if (_page is not null) CleanupPage(_page);
+        _page = null;
+    }
+
+    private static void CleanupPage(ContentPage page)
+    {
+        switch (page)
         {
-            _presentation?.Dismiss();
-            _presentation = null;
-            if (_page is Views.SecondScreenBoxPage boxPage)
+            case Views.SecondScreenBoxPage boxPage:
                 boxPage.Cleanup();
-            else if (_page is Views.PokeparkJournalPage journalPage)
+                break;
+            case Views.PokeparkJournalPage journalPage:
                 journalPage.Cleanup();
-            _page = null;
+                break;
+            case Views.NintendoDsSecondaryScreenPage gamePage:
+                gamePage.Cleanup();
+                break;
         }
     }
 

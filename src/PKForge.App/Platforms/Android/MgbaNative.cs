@@ -5,15 +5,19 @@ namespace PKForge.App.Platforms.Android;
 /// <summary>
 /// P/Invoke over PKForge's libmgba shim (tools/build-mgba/jni_bridge.c), built as
 /// libpkforge_mgba.so for arm64-v8a. The shim is flat C over mGBA's mCore API
-/// (0.10.5, signature-for-signature from mgba/core/core.h): every function
-/// returns int (1 = success, 0 = failure) and every string is UTF-8 — no C bool
-/// marshalling, no struct layouts on the managed side.
+/// (0.10.5, signature-for-signature from mgba/core/core.h): status functions
+/// return int (1 = success, 0 = failure), core handles use native pointer size,
+/// and every string is UTF-8 — no C bool marshalling or struct layouts on the
+/// managed side.
 /// </summary>
 internal static partial class MgbaNative
 {
     private const string Library = "pkforge_mgba";
 
     // ---- Lifecycle ----
+
+    [LibraryImport(Library, EntryPoint = "pkforg_core_available")]
+    internal static partial int CoreAvailable();
 
     /// <summary>mCoreFind + init + loadConfig; returns the core handle, 0 on failure.</summary>
     [LibraryImport(Library, EntryPoint = "pkforg_core_create", StringMarshalling = StringMarshalling.Utf8)]
@@ -25,6 +29,14 @@ internal static partial class MgbaNative
     /// <summary>loadROM + loadSave + reset; 1 on success.</summary>
     [LibraryImport(Library, EntryPoint = "pkforg_core_load", StringMarshalling = StringMarshalling.Utf8)]
     internal static partial int CoreLoad(nint core, string romPath, string? savePath);
+
+    /// <summary>Writes the core's current battery RAM to its save file and syncs it to storage.</summary>
+    [LibraryImport(Library, EntryPoint = "pkforg_core_flush_save", StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial int CoreFlushSave(nint core, string savePath);
+
+    /// <summary>Copies the mGBA savedata clone; returns 0 when it does not fit.</summary>
+    [LibraryImport(Library, EntryPoint = "pkforg_core_copy_savedata")]
+    internal static partial UIntPtr CoreCopySavedata(nint core, Span<byte> destination, UIntPtr capacity);
 
     // ---- Run ----
 

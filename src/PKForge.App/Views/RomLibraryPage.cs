@@ -9,30 +9,39 @@ namespace PKForge.App.Views;
 /// <summary>
 /// The game library, PlayHub-style: one card per discovered Pokémon ROM with its
 /// artwork (cartridge mark as fallback), the generation · emulator subtitle, and a
-/// colored status line — green when a save was found, amber when the ROM is linked,
-/// muted otherwise. Tapping a playable row launches it in the console's bound
-/// emulator. The emulator chips above link in one tap through the standard save
-/// folders, never a folder picker.
+/// ROM filename. Tapping a playable row launches it in the console's bound
+/// emulator. Search filters by game, ROM filename, or console; the same list can
+/// be navigated with a controller.
 /// </summary>
 public sealed class RomLibraryPage : ContentPage, IPadHandler
 {
+    private sealed record LibraryCard(string GameName, int Generation, LibraryRom? Rom);
+    private sealed record LibraryRow(LibraryCard Card, View View);
+
     private readonly IRomScanner _scanner;
     private readonly IRomLibraryStore _library;
     private readonly IConsoleEmulatorStore _consoleEmulators;
     private readonly IEmulatorLauncher _launcher;
-    private readonly DirectSaveScanner? _saveScanner;
     private VerticalStackLayout _rows = null!;
+    private ScrollView _scroll = null!;
+    private Entry _search = null!;
+    private Button _scanButton = null!;
     private Grid _hostGrid = null!;
     private Label _readout = null!;
     private Label _countLabel = null!;
+    private readonly List<LibraryRow> _catalogRows = [];
+    private readonly List<LibraryRow> _visibleRows = [];
+    private readonly List<LibraryRow> _visiblePlayableRows = [];
+    private IReadOnlyList<LibraryRom> _allRoms = [];
+    private int _selectedRomIndex = -1;
+    private bool _scanInProgress;
 
-    public RomLibraryPage(IRomScanner scanner, IRomLibraryStore library, IConsoleEmulatorStore consoleEmulators, IEmulatorLauncher launcher, ISaveEngine? engine = null)
+    public RomLibraryPage(IRomScanner scanner, IRomLibraryStore library, IConsoleEmulatorStore consoleEmulators, IEmulatorLauncher launcher)
     {
         _scanner = scanner;
         _library = library;
         _consoleEmulators = consoleEmulators;
         _launcher = launcher;
-        _saveScanner = engine is not null ? new DirectSaveScanner(engine) : null;
         Title = AppStrings.LibraryTitle;
         BackgroundColor = UiTokens.Housing;
         NavigationPage.SetHasNavigationBar(this, false);
@@ -52,18 +61,18 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
             VerticalOptions = LayoutOptions.Center,
         };
 
-        var scan = Kit.Capsule(AppStrings.ScanRoms, UiTokens.Cyan);
-        scan.Clicked += (_, _) => _ = ScanAsync();
+        _scanButton = Kit.Capsule(AppStrings.ScanRoms, UiTokens.Cyan);
+        _scanButton.Clicked += (_, _) => _ = ScanAsync();
 
         var titleRow = new Grid
         {
             ColumnSpacing = 10,
             ColumnDefinitions = [new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto), new(GridLength.Auto)],
-            Children = { back, header, _countLabel, scan },
+            Children = { back, header, _countLabel, _scanButton },
         };
         Grid.SetColumn(header, 1);
         Grid.SetColumn(_countLabel, 2);
-        Grid.SetColumn(scan, 3);
+        Grid.SetColumn(_scanButton, 3);
 
         _readout = new Label
         {
@@ -73,21 +82,45 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
             LineBreakMode = LineBreakMode.WordWrap,
         };
 
+        _search = new Entry
+        {
+            Placeholder = AppStrings.LibrarySearchPlaceholder,
+            ClearButtonVisibility = ClearButtonVisibility.WhileEditing,
+            ReturnType = ReturnType.Search,
+            IsSpellCheckEnabled = false,
+            IsTextPredictionEnabled = false,
+            FontSize = 14,
+            TextColor = UiTokens.Ink0,
+            PlaceholderColor = UiTokens.Ink1,
+            BackgroundColor = UiTokens.ShellPress,
+            HeightRequest = 40,
+        };
+        _search.TextChanged += (_, _) => ApplySearch();
+        _search.Completed += (_, _) => _search.Unfocus();
+
         _rows = new VerticalStackLayout { Spacing = 6 };
-        var scrollable = new ScrollView
+        _scroll = new ScrollView
         {
             Orientation = ScrollOrientation.Vertical,
             VerticalScrollBarVisibility = ScrollBarVisibility.Never,
             Content = _rows,
         };
+        var hints = Kit.WindowHints(
+            ("A", AppStrings.Play, LaunchSelected),
+            ("B", AppStrings.Back, () => _ = Navigation.PopAsync()),
+            ("Y", AppStrings.LibrarySearch, () => _search.Focus()),
+            ("X", AppStrings.LibraryClearSearch, () => _search.Text = string.Empty),
+            ("+", AppStrings.ScanRoms, () => _ = ScanAsync()));
 
         var body = new Grid
         {
             RowSpacing = 10,
-            RowDefinitions = [new(GridLength.Auto), new(GridLength.Star)],
-            Children = { Kit.Well(_readout, padding: 8), scrollable },
+            RowDefinitions = [new(GridLength.Auto), new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto)],
+            Children = { Kit.Well(_readout, padding: 8), _search, _scroll, hints },
         };
-        Grid.SetRow(scrollable, 1);
+        Grid.SetRow(_search, 1);
+        Grid.SetRow(_scroll, 2);
+        Grid.SetRow(hints, 3);
 
         var panel = Kit.DevicePanel(body);
         var root = new Grid
@@ -112,29 +145,119 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
     protected override void OnDisappearing()
     {
         base.OnDisappearing();
+        _search.Unfocus();
         IPlatformApplication.Current?.Services.GetService<GamepadRouter>()?.Remove(this);
     }
 
     private void Rebuild(IReadOnlyList<LibraryRom> roms)
     {
         _rows.Children.Clear();
-        // The whole catalog shows: owned games first (with their ROM), the rest after,
-        // each with a colored owned/missing label.
-        var byName = roms.GroupBy(r => r.GameName, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
-        // Catalog order (Gen 1 → 9, release order within a generation): owned games
-        // show their ROM, the rest show the colored missing label.
-        var ordered = TrophyCatalog.Games
-            .Select(game => (Game: game, Rom: byName.GetValueOrDefault(Normalise(game.Label))))
-            .ToList();
-        foreach (var (game, rom) in ordered)
-            _rows.Children.Add(rom is not null ? BuildRomCard(rom) : BuildMissingCard(game.Label, game.Generation));
-        _countLabel.Text = AppStrings.RomCount(roms.Count);
-        _readout.Text = roms.Count > 0
-            ? AppStrings.RomCount(roms.Count)
-            : _scanner.RomRoot is null ? AppStrings.NoRomRoot : AppStrings.Fr
-                ? "Appuyez sur Scanner pour chercher vos ROMs dans /storage/emulated/0/ROMs."
-                : "Tap Scan to look for your ROMs in /storage/emulated/0/ROMs.";
+        _catalogRows.Clear();
+        _allRoms = roms;
+
+        // Keep every ROM for an edition; selecting only the first dump hid alternate
+        // copies and formats from both touch and controller users.
+        var byName = roms.GroupBy(rom => Normalise(rom.GameName), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key,
+                group => group.OrderBy(rom => rom.FileName, StringComparer.OrdinalIgnoreCase).ToArray(),
+                StringComparer.OrdinalIgnoreCase);
+        foreach (var (label, generation, _) in TrophyCatalog.Games)
+        {
+            if (byName.TryGetValue(Normalise(label), out var matches))
+            {
+                foreach (var rom in matches)
+                    AddCatalogRow(new LibraryCard(label, generation, rom), BuildRomCard(rom));
+            }
+            else
+            {
+                AddCatalogRow(new LibraryCard(label, generation, null), BuildMissingCard(label, generation));
+            }
+        }
+        ApplySearch();
+    }
+
+    private void AddCatalogRow(LibraryCard card, View view)
+    {
+        var row = new LibraryRow(card, view);
+        _catalogRows.Add(row);
+        _rows.Children.Add(view);
+    }
+
+    private void ApplySearch()
+    {
+        var selectedPath = SelectedRom()?.FilePath;
+        var query = _search.Text?.Trim() ?? string.Empty;
+        _visibleRows.Clear();
+        _visiblePlayableRows.Clear();
+
+        foreach (var row in _catalogRows)
+        {
+            var visible = Matches(row.Card, query);
+            row.View.IsVisible = visible;
+            if (!visible) continue;
+            _visibleRows.Add(row);
+            if (row.Card.Rom is not null) _visiblePlayableRows.Add(row);
+        }
+
+        _countLabel.Text = AppStrings.LibraryResults(
+            _visibleRows.Count, _visibleRows.Count(row => row.Card.Rom is not null));
+        _readout.Text = query.Length > 0 && _visibleRows.Count == 0
+            ? AppStrings.LibraryNoResults(query)
+            : _allRoms.Count > 0
+                ? AppStrings.LibraryReady
+                : _scanner.RomRoot is null ? AppStrings.NoRomRoot : AppStrings.LibraryScanHint;
+
+        _selectedRomIndex = selectedPath is null
+            ? -1
+            : _visiblePlayableRows.FindIndex(row => row.Card.Rom?.FilePath == selectedPath);
+        if (_selectedRomIndex < 0 && _visiblePlayableRows.Count > 0) _selectedRomIndex = 0;
+        UpdateRomSelection(scrollIntoView: false);
+    }
+
+    private static bool Matches(LibraryCard card, string query)
+    {
+        if (query.Length == 0 || card.GameName.Contains(query, StringComparison.OrdinalIgnoreCase)) return true;
+        if (card.Rom is not { } rom) return false;
+        return rom.FileName.Contains(query, StringComparison.OrdinalIgnoreCase)
+            || ConsoleNameConverter.ConsoleLabel(rom.Console).Contains(query, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private LibraryRom? SelectedRom() =>
+        (uint)_selectedRomIndex < (uint)_visiblePlayableRows.Count
+            ? _visiblePlayableRows[_selectedRomIndex].Card.Rom
+            : null;
+
+    private void SelectRom(int index, bool scrollIntoView = true)
+    {
+        if (_visiblePlayableRows.Count == 0)
+        {
+            _selectedRomIndex = -1;
+            return;
+        }
+        _selectedRomIndex = Math.Clamp(index, 0, _visiblePlayableRows.Count - 1);
+        UpdateRomSelection(scrollIntoView);
+    }
+
+    private void UpdateRomSelection(bool scrollIntoView)
+    {
+        var selectedRow = (uint)_selectedRomIndex < (uint)_visiblePlayableRows.Count
+            ? _visiblePlayableRows[_selectedRomIndex]
+            : null;
+        foreach (var row in _catalogRows)
+        {
+            if (row.Card.Rom is null || row.View is not Border border) continue;
+            var selected = ReferenceEquals(row, selectedRow);
+            border.BackgroundColor = selected ? UiTokens.SelectFill : UiTokens.Paper;
+            border.Stroke = selected ? UiTokens.Rim : UiTokens.ShellEdge;
+            border.StrokeThickness = selected ? UiTokens.PanelEdge : 1;
+        }
+        if (scrollIntoView && selectedRow is not null)
+            _ = _scroll.ScrollToAsync(selectedRow.View, ScrollToPosition.MakeVisible, true);
+    }
+
+    private void LaunchSelected()
+    {
+        if (SelectedRom() is { } rom) _ = LaunchAsync(rom);
     }
 
     private static string Normalise(string label) =>
@@ -201,8 +324,7 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
         return card;
     }
 
-    /// <summary>One game card: artwork (cartridge mark as fallback), title, generation·
-    /// emulator subtitle, and the colored status line.</summary>
+    /// <summary>One playable ROM card, including its source filename and console.</summary>
     private View BuildRomCard(LibraryRom rom)
     {
         // The artwork loads asynchronously at build time: the cartridge mark shows
@@ -272,7 +394,13 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
         // Every binding in the card reads from the row's own context.
         row.BindingContext = rom;
         var tap = new TapGestureRecognizer();
-        tap.Tapped += (_, _) => _ = LaunchAsync(rom);
+        tap.Tapped += (_, _) =>
+        {
+            var index = _visiblePlayableRows.FindIndex(candidate =>
+                string.Equals(candidate.Card.Rom?.FilePath, rom.FilePath, StringComparison.Ordinal));
+            if (index >= 0) SelectRom(index, scrollIntoView: false);
+            _ = LaunchAsync(rom);
+        };
         row.GestureRecognizers.Add(tap);
         return row;
     }
@@ -287,35 +415,47 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
         mark.IsVisible = false;
     }
 
-    /// <summary>A tap launches the game. GB/GBC/GBA always play in PKForge itself
-    /// (the embedded core); the other consoles go to their bound external emulator.</summary>
+    /// <summary>Launches ROMs with an integrated core in PKForge; otherwise uses the
+    /// selected console emulator. Pokémon ROMs never follow a stale external DS binding.</summary>
     private async Task LaunchAsync(LibraryRom rom)
     {
-        // Consoles PKForge runs in-app (GB/GBC/GBA): embedded first and only —
-        // a stale binding or an installed external emulator is never consulted.
+        var bound = _consoleEmulators.Find(rom.Console);
+        var generation = RomNameRules.GenerationOf(rom.GameName);
         if (ConsoleRules.RunsInApp(rom.Console))
         {
-            var save = Platforms.Android.EmbeddedGameSession.SavePathForRom(rom.FilePath);
-            var session = await Task.Run(() => Platforms.Android.EmbeddedGameSession.TryStart(rom.FilePath, save));
-            if (session is not null)
+            var services = IPlatformApplication.Current?.Services;
+            var romLinks = services?.GetService<IRomLinkStore>();
+            var linkedSave = romLinks?.GetAll()
+                .FirstOrDefault(link => string.Equals(link.RomUri, rom.FilePath, StringComparison.Ordinal));
+            if (linkedSave is not null && RomLinkRules.UsesIntegratedCore(generation)
+                && linkedSave.Emulator != EmulatorKind.Embedded)
+            {
+                romLinks?.Set(linkedSave with { Emulator = EmulatorKind.Embedded, Generation = generation });
+            }
+            var saveFiles = linkedSave is null ? null : services?.GetService<ISaveFileAccess>();
+            var start = await Task.Run(() => Platforms.Android.EmbeddedGameSession.TryStart(
+                rom.FilePath, generation, rom.FileName, linkedSave?.SaveDocumentId, saveFiles));
+            if (start.Session is { } session)
             {
                 await MainThread.InvokeOnMainThreadAsync(() => Navigation.PushAsync(new EmbeddedGamePage(session)));
                 return;
             }
-            await PadMenu.ShowAsync(_hostGrid, AppStrings.RomMissing,
-                $"{rom.GameName}: the embedded core is not packed in this build.", AppStrings.Ok);
+            await PadMenu.ShowAsync(_hostGrid, AppStrings.GameLaunchFailedTitle,
+                AppStrings.GameLaunchFailed(rom.GameName, start.Error, generation), AppStrings.Ok);
             return;
         }
-        var bound = _consoleEmulators.Find(rom.Console);
         var fallback = ConsoleRules.EmulatorsFor(rom.Console)
-            .FirstOrDefault(kind => EmulatorCatalog.IsInstalled(kind, _launcher.IsInstalled));
-        if (bound is null && fallback == default)
+            .Where(kind => kind != EmulatorKind.Embedded)
+            .Where(kind => EmulatorCatalog.IsInstalled(kind, _launcher.IsInstalled))
+            .Select(kind => (EmulatorKind?)kind)
+            .FirstOrDefault();
+        if (bound is null && fallback is null)
         {
             await PadMenu.ShowAsync(_hostGrid, AppStrings.RomMissing,
                 $"{rom.GameName}: {AppStrings.NotInstalled}.", AppStrings.Ok);
             return;
         }
-        var kind = bound ?? fallback;
+        var kind = bound ?? fallback!.Value;
         var link = new RomLink("library", rom.FilePath, rom.FileName, kind,
             RomNameRules.GenerationOf(rom.GameName), $"Pokémon {rom.GameName}");
         if (await _launcher.LaunchAsync(link))
@@ -332,6 +472,9 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
     /// <summary>One pass over every console's ES-DE folder; the library is replaced wholesale.</summary>
     private async Task ScanAsync()
     {
+        if (_scanInProgress) return;
+        _scanInProgress = true;
+        _scanButton.IsEnabled = false;
         _readout.Text = AppStrings.Scanning;
         try
         {
@@ -349,14 +492,24 @@ public sealed class RomLibraryPage : ContentPage, IPadHandler
         {
             _readout.Text = error.Message;
         }
+        finally
+        {
+            _scanInProgress = false;
+            _scanButton.IsEnabled = true;
+        }
     }
 
     public bool OnPadButton(PadButton button)
     {
         switch (button)
         {
-            case PadButton.A: _ = ScanAsync(); return true;
+            case PadButton.Up: SelectRom(_selectedRomIndex - 1); return true;
+            case PadButton.Down: SelectRom(_selectedRomIndex + 1); return true;
+            case PadButton.A: LaunchSelected(); return true;
             case PadButton.B: _ = Navigation.PopAsync(); return true;
+            case PadButton.X: _search.Text = string.Empty; return true;
+            case PadButton.Y: _search.Focus(); return true;
+            case PadButton.Start: _ = ScanAsync(); return true;
             default: return true; // own the pad while this page is up
         }
     }

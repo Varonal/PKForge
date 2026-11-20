@@ -1,6 +1,6 @@
 {
   "project": "PKForge",
-  "branchName": "ralph/external-companion",
+  "branchName": "codex/roadmap-sync",
   "description": "Companion de jeu externe (run Ralph) : garder le second écran de l'AYN Thor vivant pendant qu'un émulateur tiers tourne au premier plan. Contrairement au companion PokéDaisy natif (lecture directe de la mémoire du cœur mGBA), celui-ci est alimenté par le polling du fichier de sauvegarde .sav que l'émulateur externe écrit sur disque : stats live, dex, points de restauration.",
   "userStories": [
     {
@@ -78,8 +78,8 @@
         "Logique domaine pure testée (nommage, horodatage, ordre) ; build App et tests Domain passent"
       ],
       "priority": 5,
-      "passes": true,
-      "notes": "Domain rules pure + testées: RestorePointRules.ForGame (filtre BelongsTo, newest-first), OrderNewestFirst, NameFor(kind, utc, fr) nommage horodaté invariant (FR/EN). App: ExternalRestorePointService (DI) — ListForAsync via IBackupService.ListAsync + BelongsTo(savePath, snapshot); CreatePointAsync = backup atomique nommé/horodaté via IBackupService.CreateAsync(documentId=savePath), jamais d'écriture in-place; RestoreAsync = PadMenu.ConfirmAsync obligatoire (destructif) + safety backup de la save courante + ReadAsync(hash-check) + écriture atomique temp+move. Chaînes UI FR/EN dans AppStrings. 8 tests Domain. CI: tests Release + build APK. Manuel on device (US-007 branche la vue companion): depuis le companion d'un jeu externe, créer un point, le voir listé en tête, restaurer avec confirmation → le .sav est remplacé et un point de sécurité existe; aucun crash si le point est corrompu."
+      "passes": false,
+      "notes": "Audit du 2026-11-20 : les règles pures Domain sont présentes et testées, mais le service App n'était enregistré sans aucun appel depuis la vue; les critères de liste/création/restauration n'étaient donc pas accessibles. Le service App et ses chaînes inutilisées ont été retirés. La vue compagnon n'affiche plus de backups non filtrés. À reprendre avec un flux UI lié au .sav externe et une restauration qui n'écrase pas les changements en RAM d'un émulateur encore actif."
     },
     {
       "id": "US-006",
@@ -109,8 +109,8 @@
         "AGENTS.md et progress.txt contiennent les apprentissages réutilisables de la run"
       ],
       "priority": 7,
-      "passes": true,
-      "notes": "Finalization. Companion view: GameCompanionView.ShowExternal(ExternalCompanionSnapshot, PlaySessionStats?) renders dex/party/save-playtime/session-chrono/total on the lower screen; SecondScreenBoxPage.SwapCoreAsync feeds it from IGameCompanionStore.External + IExternalCompanionStateStore.RomPath + IPlaySessionStore, and reacts to the External PropertyChanged — the overlay lives only on the second screen, never over the emulator's first screen, and is read-only. README: 'Companion de jeu externe (modèle polling .sav)' moved En cours -> Fait. AGENTS.md created at repo root with the run's reusable patterns. All UI strings FR-default/EN in AppStrings. Full CI: Domain tests Release + App net10.0-android build. Manual on device: launch a DS game in melonDS -> lower screen shows the external companion and refreshes within ~10 s of an in-game save, first screen untouched; back in PKForge -> companion stops, trophy scan runs."
+      "passes": false,
+      "notes": "Audit du 2026-11-20 : la vue companion externe, le README et les chaînes sont prêts, mais US-005 reste ouverte; la finalisation globale ne passe donc pas. Reprendre après la liste, la création et la restauration sécurisée des points externes. Validation appareil encore requise : lancer un jeu DS dans melonDS, vérifier le companion sur l'écran inférieur et l'émulateur intact sur le premier écran, puis revenir dans PKForge et vérifier l'arrêt du companion et le scan de trophées."
     }
   ]
 }

@@ -1,7 +1,7 @@
 /* PKForge's flat C shim over libmgba 0.10.5 (mgba/core/core.h), the layer
- * MgbaNative.cs P/Invokes. Every function returns int (1 = success, 0 = failure)
- * and every string is UTF-8: no C bools to marshal, no struct layouts on the
- * managed side. One core handle per ROM; the caller owns the threading.
+ * MgbaNative.cs P/Invokes. Status functions return int (1 = success, 0 = failure),
+ * handles use intptr_t, and strings are UTF-8: no C bools to marshal and no struct
+ * layouts on the managed side. One core handle per ROM; the caller owns threading.
  *
  * Built by tools/build-mgba/build.sh (NDK, arm64-v8a) into libpkforge_mgba.so,
  * linking libmgba static — the same flags PokeDaisy uses:
@@ -12,6 +12,8 @@
 #include <mgba/core/core.h>
 #include <mgba/core/blip_buf.h>
 #include <mgba-util/vfs.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -26,7 +28,11 @@ struct PkforgeCore {
 	uint32_t* frame;
 };
 
-int pkforg_core_create(const char* romPath) {
+int pkforg_core_available(void) {
+	return 1;
+}
+
+intptr_t pkforg_core_create(const char* romPath) {
 	struct mCore* core = mCoreFind(romPath);
 	if (!core) {
 		return 0;
@@ -38,6 +44,7 @@ int pkforg_core_create(const char* romPath) {
 	/* The port name picks mGBA's config section; NULL keeps the default ("None"),
 	 * which is fine: PKForge sets no per-port options through mCoreConfig. */
 	mCoreInitConfig(core, NULL);
+	mCoreLoadConfig(core);
 	struct PkforgeCore* handle = malloc(sizeof(struct PkforgeCore));
 	if (!handle) {
 		core->deinit(core);
@@ -45,7 +52,7 @@ int pkforg_core_create(const char* romPath) {
 	}
 	handle->core = core;
 	handle->frame = NULL;
-	return (int)(intptr_t)handle;
+	return (intptr_t)handle;
 }
 
 void pkforg_core_destroy(intptr_t coreHandle) {
@@ -74,18 +81,13 @@ int pkforg_core_load(intptr_t coreHandle, const char* romPath, const char* saveP
 	if (!core || !romPath) {
 		return 0;
 	}
-	struct VFile* rom = VFileOpen(romPath, O_RDONLY);
-	if (!rom) {
-		return 0;
-	}
-	if (!core->loadROM(core, rom)) {
-		rom->close(rom);
+	if (!mCoreLoadFile(core, romPath)) {
 		return 0;
 	}
 	if (savePath) {
 		struct VFile* save = VFileOpen(savePath, O_RDWR | O_CREAT);
-		if (save) {
-			core->loadSave(core, save);
+		if (!save || !core->loadSave(core, save)) {
+			return 0;
 		}
 	}
 	/* The video buffer is allocated and pinned once, at load: the core renders into
@@ -94,16 +96,88 @@ int pkforg_core_load(intptr_t coreHandle, const char* romPath, const char* saveP
 	unsigned width = 0;
 	unsigned height = 0;
 	core->desiredVideoDimensions(core, &width, &height);
+	if (width == 0 || height == 0) {
+		return 0;
+	}
+	if ((size_t)width > SIZE_MAX / height) {
+		return 0;
+	}
 	size_t pixels = (size_t)width * height;
+	if (pixels > SIZE_MAX / sizeof(uint32_t)) {
+		return 0;
+	}
 	uint32_t* frame = malloc(pixels * sizeof(uint32_t));
-	if (frame) {
-		core->setVideoBuffer(core, frame, width);
+	if (!frame) {
+		return 0;
 	}
-	if (handle) {
-		handle->frame = frame;
-	}
+	core->setVideoBuffer(core, frame, width);
+	handle->frame = frame;
 	core->reset(core);
 	return 1;
+}
+
+int pkforg_core_flush_save(intptr_t coreHandle, const char* savePath) {
+	struct mCore* core = asCore(coreHandle);
+	if (!core || !savePath || !core->savedataClone) {
+		return 0;
+	}
+
+	void* savedata = NULL;
+	size_t savedataSize = core->savedataClone(core, &savedata);
+	if (savedataSize && !savedata) {
+		return 0;
+	}
+	struct VFile* vf = VFileOpen(savePath, O_RDWR | O_CREAT);
+	if (!vf) {
+		free(savedata);
+		return 0;
+	}
+
+	ssize_t fileSize = vf->size(vf);
+	if (fileSize < 0) {
+		vf->close(vf);
+		free(savedata);
+		return 0;
+	}
+	size_t trailerSize = (size_t)fileSize > savedataSize ? (size_t)fileSize - savedataSize : 0;
+	uint8_t* trailer = trailerSize ? malloc(trailerSize) : NULL;
+	if (trailerSize && (!trailer
+	    || vf->seek(vf, (off_t)savedataSize, SEEK_SET) < 0
+	    || vf->read(vf, trailer, trailerSize) != (ssize_t)trailerSize)) {
+		vf->close(vf);
+		free(trailer);
+		free(savedata);
+		return 0;
+	}
+
+	bool ok = vf->seek(vf, 0, SEEK_SET) >= 0
+	    && (!savedataSize || vf->write(vf, savedata, savedataSize) == (ssize_t)savedataSize)
+	    && (!trailerSize || vf->write(vf, trailer, trailerSize) == (ssize_t)trailerSize);
+	if (ok) {
+		vf->truncate(vf, savedataSize + trailerSize);
+		ok = vf->sync(vf, NULL, 0);
+	}
+	vf->close(vf);
+	free(trailer);
+	free(savedata);
+	return ok ? 1 : 0;
+}
+
+size_t pkforg_core_copy_savedata(intptr_t coreHandle, uint8_t* destination, size_t capacity) {
+	struct mCore* core = asCore(coreHandle);
+	if (!core || !core->savedataClone || !destination || capacity == 0) {
+		return 0;
+	}
+
+	void* savedata = NULL;
+	size_t size = core->savedataClone(core, &savedata);
+	if (!size || !savedata || size > capacity) {
+		free(savedata);
+		return 0;
+	}
+	memcpy(destination, savedata, size);
+	free(savedata);
+	return size;
 }
 
 void pkforg_core_run_frame(intptr_t coreHandle) {
@@ -165,25 +239,27 @@ int pkforg_core_read_bytes(intptr_t coreHandle, uint32_t address, uint8_t* desti
 		return 0;
 	}
 	/* mCoreGetMemoryBlockInfo resolves the block that owns the address (mirrors
-	 * included); the read is a single memcpy when the range fits the block,
-	 * per-word bus reads otherwise (unmapped or straddling ranges).
+	 * included); copy mapped ranges directly and use byte bus reads when the block
+	 * cannot be exposed as a contiguous memory buffer.
 	 */
+	if (length - 1 > UINT32_MAX - address) {
+		return 0;
+	}
 	const struct mCoreMemoryBlock* info = mCoreGetMemoryBlockInfo(core, address);
-	if (!info || info->size == 0 || address < info->start
-	    || length > (size_t)(info->end - address) || address < info->start) {
-		for (size_t i = 0; i < length; i += 4) {
-			uint32_t word = core->busRead32(core, address + (uint32_t)i);
-			size_t chunk = length - i < 4 ? length - i : 4;
-			memcpy(destination + i, &word, chunk);
-		}
-		return 1;
+	if (!info || info->size == 0 || address < info->start || address >= info->end
+	    || length > (size_t)(info->end - address)) {
+		return 0;
 	}
 	size_t blockSize = 0;
 	void* block = mCoreGetMemoryBlock(core, info->start, &blockSize);
-	if (!block || blockSize < info->size) {
-		return 0;
+	size_t offset = address - info->start;
+	if (block && offset <= blockSize && length <= blockSize - offset) {
+		memcpy(destination, (uint8_t*)block + offset, length);
+		return 1;
 	}
-	memcpy(destination, (uint8_t*)block + (address - info->start), length);
+	for (size_t i = 0; i < length; ++i) {
+		destination[i] = (uint8_t)core->busRead8(core, address + (uint32_t)i);
+	}
 	return 1;
 }
 

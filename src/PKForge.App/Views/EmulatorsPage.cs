@@ -184,17 +184,24 @@ public sealed class EmulatorsPage : ContentPage, IPadHandler
         return Kit.Well(line, padding: 10);
     }
 
-    /// <summary>The Cocoon flow: the console's installed emulators, one tap binds.
-    /// Consoles PKForge runs in-app (GB/GBC/GBA) never reach here: no row, no binding.</summary>
+    /// <summary>The console's emulator choice. Pokémon games for integrated consoles
+    /// always stay in PKForge; external apps remain listed for save-file discovery.</summary>
     private async Task ChooseConsoleEmulatorAsync(ConsoleRow row)
     {
         if (ConsoleRules.RunsInApp(row.Console))
         {
-            _viewModel.Status = $"{row.Name}: plays in PKForge itself.";
+            var available = row.Console == GameConsole.NintendoDs
+                ? EmulatorCatalog.EmbeddedDsCoreAvailable
+                : EmulatorCatalog.EmbeddedCoreAvailable;
+            _viewModel.Status = available
+                ? $"{row.Name}: plays in PKForge itself."
+                : $"{row.Name}: the PKForge core is missing from this APK.";
             return;
         }
         var candidates = ConsoleRules.EmulatorsFor(row.Console)
-            .Where(kind => kind != EmulatorKind.Embedded && EmulatorCatalog.IsInstalled(kind, _launcher.IsInstalled))
+            .Where(kind => kind == EmulatorKind.Embedded
+                ? row.Console == GameConsole.NintendoDs && EmulatorCatalog.EmbeddedDsCoreAvailable
+                : EmulatorCatalog.IsInstalled(kind, _launcher.IsInstalled))
             .ToList();
         if (candidates.Count == 0)
         {
@@ -308,7 +315,7 @@ public sealed class EmulatorsPage : ContentPage, IPadHandler
         var consoles = Enum.GetValues<GameConsole>();
         foreach (var console in consoles)
         {
-            // Consoles PKForge runs in-app (GB/GBC/GBA): no external binding row, ever.
+            // Integrated Pokémon consoles have no external launch binding.
             if (ConsoleRules.RunsInApp(console))
                 continue;
             var bound = _consoleEmulators.Find(console);

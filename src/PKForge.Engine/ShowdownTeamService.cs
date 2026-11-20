@@ -19,7 +19,7 @@ public static class ShowdownTeamService
         ArgumentNullException.ThrowIfNull(paste);
         var lines = paste.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n')
             .Where(line => !line.TrimStart().StartsWith("===", StringComparison.Ordinal));
-        var text = string.Join('\n', lines);
+        var text = string.Join('\n', lines).TrimStart();
         var result = new List<(string, ShowdownSet)>();
         var start = 0;
         while (start < text.Length)

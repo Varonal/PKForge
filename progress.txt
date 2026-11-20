@@ -131,3 +131,19 @@ null path). prd.json: US-004 passes=true. progress.txt: appended learnings." && 
   - Le companion reste **read-only** côté vue : les actions destructives (restore) passent par `PadMenu.ConfirmAsync` sur le host, jamais en direct depuis le 2ᵉ écran.
   - Historique git de la run : uniquement des commits conventionnels `feat: US-00X - ...` + `fix:`/`docs:` — aucun WIP.
 ---
+
+## 2026-11-20 - Revue avant APK 3.1.15
+- Mise à jour de `main` sur la dernière tête `origin/main` (`0497d5e`), en conservant le travail local d'émulation et en fusionnant le compagnon externe avec les options de vitesse du compagnon embarqué.
+- Vérification de code : aucune méthode privée inutilisée détectée par IDE0051. `git diff --check` ne signale pas d'erreur de whitespace; il reste un avertissement de conversion CRLF/LF attendu sur le script natif.
+- Revue de US-005 : les règles Domain ont des tests, mais `ExternalRestorePointService` n'était appelé par aucune vue. Le compagnon chargeait par ailleurs les backups sans les filtrer par sauvegarde. Retrait du service App injoignable et de ses chaînes mortes; limitation de la liste affichée aux backups ayant le `SaveDocumentId` exact d'une sauvegarde embarquée. Les liens de bibliothèque et les émulateurs externes n'affichent pas de points non vérifiés.
+- US-005 repassée à `passes: false` et README corrigé. La restauration externe reste à intégrer après conception d'un flux qui attend l'arrêt de l'émulateur avant de remplacer le `.sav`.
+- APK Release Android arm64 construit avec succès (0 avertissement, 0 erreur), version `3.1.15` / code `325`; signature v1/v2/v3 vérifiée et alignement zip vérifié. Aucun appareil ADB n'était connecté pour un essai sur Thor.
+---
+## 2026-11-20 - Synchronisation de la roadmap et pré-merge
+- Roadmaps recensées : `README.md` (état produit), `prd.json` (stories) et ce journal append-only. README distingue les fonctions livrées des validations Thor/saves réelles encore ouvertes; US-005 et US-007 restent `passes: false`, DS Gen 4-5 reste à valider sur appareil, companion DS simultané reste à concevoir, 3DS n'est pas présenté comme intégré. `prd.json.branchName` suit la branche de cette livraison.
+- Review : `ShowdownTeamService.Split` ignore maintenant les séparateurs initiaux laissés par les en-têtes Showdown filtrés. Le test normalise ses fins de ligne avec `ReplaceLineEndings`, quel que soit le checkout LF/CRLF. Les tests d'émulation définissent explicitement les cœurs présents et couvrent la route DS intégrée.
+- Vérifications Release : Domain 1 095/1 095; Engine 992/992. Build Android Debug `net10.0-android` réussi (0 avertissement, 0 erreur). Validation manuelle sur AYN Thor et saves DS réelles toujours en attente.
+---
+## 2026-11-20 - APK de test après revue
+- APK Release `3.1.15` / code `325` reconstruit après les corrections : `artifacts/PKForge-3.1.15-android-arm64.apk` (82 585 907 octets). Signature Android Debug présente, zipalign validé, `libpkforge_mgba.so` et `libpkforge_melonds.so` inclus. Aucun APK ajouté au dépôt.
+---

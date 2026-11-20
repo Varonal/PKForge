@@ -38,7 +38,7 @@ public static class SaveIdentitySheet
         if (offerOpen) options.Add(new PadOption(OpenOption, IconPath: "play"));
         if (romLink is { } linked)
         {
-            var where = linked.Generation is >= 1 and <= 3
+            var where = RomLinkRules.MustRunInApp(linked.Generation, linked.RomFileName)
                 ? (AppStrings.Fr ? "dans PKForge" : "in PKForge")
                 : $"in {SaveDescriptions.EmulatorName(linked.Emulator)}";
             options.Add(new PadOption(PlayOption, IconPath: "play",
@@ -47,7 +47,7 @@ public static class SaveIdentitySheet
         }
         options.Add(new PadOption(LinkRomOption, IconPath: "file",
             Detail: romLink is null
-                ? (AppStrings.Fr ? "Choisissez la ROM de ce jeu une fois ; Jouer la lancera dans PKForge (GB/GBA) ou son émulateur." : "Pick this game's ROM once; Play then launches it in PKForge (GB/GBA) or its emulator.")
+                ? (AppStrings.Fr ? "Choisissez la ROM de ce jeu une fois ; Jouer la lancera dans PKForge (GB/GBC/GBA/DS .nds) ou via un émulateur externe tant que le cœur de sa console manque." : "Pick this game's ROM once; Play launches it in PKForge (GB/GBC/GBA/DS .nds), or an external emulator while that console's core is still missing.")
                 : (AppStrings.Fr ? $"Remplacer {romLink.RomFileName}." : $"Replace {romLink.RomFileName}.")));
         options.Add(new PadOption(RenameOption, IconPath: "rename"));
         options.Add(new PadOption(ColorOption, Glyph: "●", Accent: SaveColors.For(resolved?.ColorKey, save.Generation),
@@ -115,13 +115,17 @@ public static class SaveIdentitySheet
 
     private static IDocumentPicker? FilePicker => IPlatformApplication.Current?.Services.GetService<IDocumentPicker>();
 
-    /// <summary>Launches a linked ROM: GB/GBC/GBA (Gen 1-3) play in PKForge itself via the
-    /// embedded core; anything else is handed to its external emulator.</summary>
+    /// <summary>Launches supported Gen 1-5 Pokémon ROMs in PKForge. Older saved DS links
+    /// are migrated on first play so a stale third-party selection cannot take over.</summary>
     private static async Task LaunchAsync(Grid host, RomLink link)
     {
-        if (link.Generation is >= 1 and <= 3)
+        if (RomLinkRules.MustRunInApp(link.Generation, link.RomFileName))
         {
-            await LaunchEmbeddedAsync(host, link);
+            var generation = RomLinkRules.ResolveIntegratedGeneration(link.Generation, link.RomFileName);
+            var integratedLink = link with { Emulator = EmulatorKind.Embedded, Generation = generation };
+            if (link.Emulator != EmulatorKind.Embedded || link.Generation != generation)
+                RomLinks?.Set(integratedLink);
+            await LaunchEmbeddedAsync(host, integratedLink);
             return;
         }
         var launcher = Launcher;
@@ -140,12 +144,13 @@ public static class SaveIdentitySheet
     /// <summary>Opens the linked GB/GBC/GBA ROM in the embedded game screen.</summary>
     private static async Task LaunchEmbeddedAsync(Grid host, RomLink link)
     {
-        var save = Platforms.Android.EmbeddedGameSession.SavePathForRom(link.RomUri);
-        var session = await Task.Run(() => Platforms.Android.EmbeddedGameSession.TryStart(link.RomUri, save));
-        if (session is null)
+        var saveFiles = IPlatformApplication.Current?.Services.GetService<ISaveFileAccess>();
+        var start = await Task.Run(() => Platforms.Android.EmbeddedGameSession.TryStart(
+            link.RomUri, link.Generation, link.RomFileName, link.SaveDocumentId, saveFiles));
+        if (start.Session is not { } session)
         {
-            await PadMenu.ShowAsync(host, "Could not launch",
-                $"{link.RomFileName}: the embedded core is not packed in this build.", "OK");
+            await PadMenu.ShowAsync(host, AppStrings.GameLaunchFailedTitle,
+                AppStrings.GameLaunchFailed(link.RomFileName, start.Error, link.Generation), AppStrings.Ok);
             return;
         }
         await MainThread.InvokeOnMainThreadAsync(async () =>
@@ -178,20 +183,46 @@ public static class SaveIdentitySheet
 
         if (candidates.FirstOrDefault(r => r.FileName == choice) is { } fromLibrary)
         {
-            // Gen 1-3 (GB/GBC/GBA) always launch embedded in PKForge; the console binding
-            // only matters for the consoles that still need an external emulator.
-            var kind = ConsoleRules.RunsInApp(fromLibrary.Console)
-                ? EmulatorKind.Embedded
-                : IPlatformApplication.Current?.Services.GetService<IConsoleEmulatorStore>()?.Find(fromLibrary.Console)
-                    ?? ConsoleRules.EmulatorsFor(fromLibrary.Console)
-                        .FirstOrDefault(k => k != EmulatorKind.Embedded && EmulatorCatalog.IsInstalled(k, Launcher is { } l ? l.IsInstalled : _ => false));
-            if (kind == default && !ConsoleRules.RunsInApp(fromLibrary.Console))
+            var generation = fromLibrary.Generation > 0 ? fromLibrary.Generation : save.Generation;
+            if (RomLinkRules.UsesIntegratedCore(generation))
+            {
+                if (!RomLinkRules.IsSupportedEmbeddedFormat(generation, fromLibrary.FileName))
+                {
+                    await PadMenu.ShowAsync(host, "ROM non prise en charge",
+                        AppStrings.EmbeddedRomFormatUnsupported(generation, fromLibrary.FileName), AppStrings.Ok);
+                    return;
+                }
+
+                var coreAvailable = generation is >= 1 and <= 3
+                    ? EmulatorCatalog.EmbeddedCoreAvailable
+                    : EmulatorCatalog.EmbeddedDsCoreAvailable;
+                if (!coreAvailable)
+                {
+                    await PadMenu.ShowAsync(host, AppStrings.GameLaunchFailedTitle,
+                        AppStrings.EmbeddedCoreMissing(generation), AppStrings.Ok);
+                    return;
+                }
+
+                links.Set(new RomLink(save.DocumentId, fromLibrary.FilePath, fromLibrary.FileName,
+                    EmulatorKind.Embedded, generation, save.EngineHint));
+                return;
+            }
+
+            var consoleEmulators = IPlatformApplication.Current?.Services.GetService<IConsoleEmulatorStore>();
+            var bound = consoleEmulators?.Find(fromLibrary.Console);
+            EmulatorKind? kind = bound is null or EmulatorKind.Embedded ? null : bound;
+            kind ??= ConsoleRules.EmulatorsFor(fromLibrary.Console)
+                .Where(k => k != EmulatorKind.Embedded)
+                .Where(k => EmulatorCatalog.IsInstalled(k, Launcher is { } l ? l.IsInstalled : _ => false))
+                .Select(k => (EmulatorKind?)k)
+                .FirstOrDefault();
+            if (kind is null)
             {
                 await PadMenu.ShowAsync(host, AppStrings.RomMissing,
                     $"Bind an emulator for the {fromLibrary.Console} in the Emulators tab, or install one.", "OK");
                 return;
             }
-            links.Set(new RomLink(save.DocumentId, fromLibrary.FilePath, fromLibrary.FileName, kind, save.Generation, save.EngineHint));
+            links.Set(new RomLink(save.DocumentId, fromLibrary.FilePath, fromLibrary.FileName, kind.Value, generation, save.EngineHint));
             return;
         }
 
@@ -205,11 +236,21 @@ public static class SaveIdentitySheet
         var emulators = RomLinkRules.EmulatorsForRom(save.Generation, name);
         if (emulators.Count == 0)
         {
+            if (RomLinkRules.UsesIntegratedCore(save.Generation)
+                && RomLinkRules.IsSupportedEmbeddedFormat(save.Generation, name))
+            {
+                await PadMenu.ShowAsync(host, AppStrings.GameLaunchFailedTitle,
+                    AppStrings.EmbeddedCoreMissing(save.Generation), AppStrings.Ok);
+                return;
+            }
             await PadMenu.ShowAsync(host, "ROM not linked",
-                $"PKForge cannot launch a Gen {save.Generation} game from {name}. Link a ROM for a Game Boy, GBA or Nintendo DS Pokémon game instead.", "OK");
+                $"PKForge cannot launch a Gen {save.Generation} game from {name}. Link a ROM for a Game Boy, Game Boy Color, GBA or Nintendo DS Pokémon game instead.", "OK");
             return;
         }
-        var installed = emulators.Where(kind => EmulatorCatalog.IsInstalled(kind, Launcher is { } l ? l.IsInstalled : _ => false)).ToArray();
+        // RomLinkRules includes the embedded core only after checking the precise
+        // generation's library; its presence is not a generic package query.
+        var installed = emulators.Where(kind => kind == EmulatorKind.Embedded
+            || EmulatorCatalog.IsInstalled(kind, Launcher is { } l ? l.IsInstalled : _ => false)).ToArray();
         if (installed.Length == 0)
         {
             await PadMenu.ShowAsync(host, AppStrings.RomMissing,

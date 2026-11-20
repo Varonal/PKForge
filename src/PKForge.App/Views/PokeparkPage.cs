@@ -1102,17 +1102,6 @@ public sealed class PokeparkPage : ContentPage, IPadHandler, IPadStickHandler
         };
     }
 
-    private static ParkEnvironmentId HomeHabitat(ParkPokemon mon)
-    {
-        var types = HabitatCatalog.TypesFor(mon.Species, mon.Form);
-        if (types.Contains(ParkType.Water)) return ParkEnvironmentId.WaterfallLake;
-        if (types.Contains(ParkType.Fire) || types.Contains(ParkType.Ground))
-            return ParkEnvironmentId.EmberGrove;
-        if (types.Contains(ParkType.Flying) || types.Contains(ParkType.Ice) || types.Contains(ParkType.Rock))
-            return ParkEnvironmentId.SkySummit;
-        return ParkEnvironmentId.Commons;
-    }
-
     private async Task ShowJournalAsync()
     {
         var offline = _offlineJournal.Load().Journal.Select(e => (At: e.Timestamp, e.Text));

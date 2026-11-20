@@ -1,14 +1,15 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Android.Media;
+using PKForge.Domain;
 using SkiaSharp;
 
 namespace PKForge.App.Platforms.Android;
 
 /// <summary>
-/// Drives an <see cref="MgbaCore"/> on its own thread at the GBA's exact frame
-/// rate (59.7275 Hz — the hardware's, not 60), and hands each finished frame to
-/// the UI as a ready-to-draw SKBitmap. The UI thread never touches the core;
+/// Drives an <see cref="MgbaCore"/> on its own thread at the handheld's frame
+/// rate (about 59.7275 Hz), and hands each finished frame to the UI as a
+/// ready-to-draw SKBitmap. The UI thread never touches the core;
 /// the engine never touches the UI except through the frame event.
 /// </summary>
 internal sealed class EmbeddedEngine : IDisposable
@@ -21,17 +22,24 @@ internal sealed class EmbeddedEngine : IDisposable
     private readonly MgbaCore _core;
     private readonly Thread _thread;
     private readonly CancellationTokenSource _cancel = new();
+    private readonly ManualResetEventSlim _resume = new(initialState: true);
+    private readonly object _coreGate = new();
+    private readonly object _lifecycleGate = new();
+    private readonly object _audioGate = new();
     private readonly object _frameGate = new();
     private SKBitmap? _frame;
     private SKImage? _frameImage;
 
-    // The GBA's audio: 32768 Hz stereo, ~548 samples per frame.
+    // mGBA's audio output: 32768 Hz stereo, about 548 samples per frame.
     private const int AudioFramesPerDrain = 1024;
     private readonly short[] _audioScratch = new short[AudioFramesPerDrain * 2];
     private readonly Java.Nio.ByteBuffer _audioBuffer;
     private readonly AudioTrack? _track;
     private volatile uint _keysPending;
     private readonly object _keyGate = new();
+    private int _speedMultiplier = 1;
+    private volatile bool _audioEnabled = true;
+    private volatile bool _disposed;
 
     /// <summary>Raised on the emu thread after each frame; the UI marshals itself.</summary>
     public event Action? FrameProduced;
@@ -72,6 +80,8 @@ internal sealed class EmbeddedEngine : IDisposable
         }
         catch (Exception)
         {
+            try { _track?.Stop(); } catch (Exception) { }
+            try { _track?.Release(); } catch (Exception) { }
             _track = null; // no audio device: the game still plays, silently
         }
     }
@@ -82,6 +92,111 @@ internal sealed class EmbeddedEngine : IDisposable
     public void SetKeys(uint bitmask)
     {
         lock (_keyGate) _keysPending = bitmask;
+    }
+
+    public void SetPaused(bool paused)
+    {
+        lock (_lifecycleGate)
+        {
+            if (_disposed) return;
+            if (paused)
+            {
+                _resume.Reset();
+                lock (_audioGate)
+                    try { _track?.Pause(); } catch (Exception) { }
+                lock (_coreGate) { } // wait until any in-flight frame has finished
+            }
+            else
+            {
+                _resume.Set();
+                if (Volatile.Read(ref _speedMultiplier) == 1)
+                    lock (_audioGate)
+                        try { _track?.Play(); } catch (Exception) { }
+            }
+        }
+    }
+
+    public void SetSpeedMultiplier(int multiplier)
+    {
+        if (multiplier is < 1 or > 4)
+            throw new ArgumentOutOfRangeException(nameof(multiplier), "The emulation speed must be between ×1 and ×4.");
+
+        var previous = Interlocked.Exchange(ref _speedMultiplier, multiplier);
+        if (previous == multiplier || _track is null) return;
+
+        lock (_audioGate)
+        {
+            try
+            {
+                if (multiplier > 1)
+                {
+                    _track.Pause();
+                    _track.Flush();
+                }
+                else if (_resume.IsSet)
+                {
+                    _track.Play();
+                }
+            }
+            catch (Exception error)
+            {
+                Services.AppLog.Warn("embedded", $"Could not update audio for emulation speed ×{multiplier}: {error.Message}");
+            }
+        }
+    }
+
+    public bool ReadBytes(uint address, Span<byte> destination)
+    {
+        lock (_coreGate)
+            return !_disposed && _core.ReadBytes(address, destination);
+    }
+
+    public LiveCompanionSnapshot? ReadLiveCompanion(
+        int generation,
+        int maxSpecies,
+        string romFileName)
+    {
+        lock (_coreGate)
+        {
+            if (_disposed) return null;
+
+            // mGBA's savedata clone is the canonical battery image for each cartridge
+            // type. The GBA flash save can be 128 KiB while its bus window is only 64 KiB.
+            var saveRam = new byte[0x20000];
+            var saveSize = _core.CopySavedata(saveRam);
+            if (saveSize <= 0) return null;
+            if (saveSize != saveRam.Length) Array.Resize(ref saveRam, saveSize);
+
+            if (generation is 1 or 2)
+                return LiveGen12SaveReader.Read(saveRam, generation, _core.GameTitle, _core.GameCode, romFileName);
+            if (generation != 3 || saveSize < 0x1C000)
+                return null;
+
+            // A partially written Gen 3 save must not be surfaced to the companion.
+            var companionData = LiveGen3SaveReader.Read(saveRam, _core.GameCode);
+            if (companionData is null) return null;
+            var snapshot = LiveGbaCompanion.Read(_core.GameTitle, _core.GameCode, saveRam, maxSpecies);
+            if (snapshot is null) return null;
+            return snapshot with { Party = companionData.Party, Bag = companionData.Bag };
+        }
+    }
+
+    public bool SaveState(string path)
+    {
+        lock (_coreGate)
+            return !_disposed && _core.IsRunning && _core.SaveState(path);
+    }
+
+    public bool LoadState(string path)
+    {
+        lock (_coreGate)
+            return !_disposed && _core.IsRunning && _core.LoadState(path);
+    }
+
+    public bool FlushSave(string path)
+    {
+        lock (_coreGate)
+            return !_disposed && _core.IsRunning && _core.FlushSave(path);
     }
 
     /// <summary>Draws the newest frame into the canvas, scaled to fit, pixel-crisp.</summary>
@@ -99,61 +214,106 @@ internal sealed class EmbeddedEngine : IDisposable
 
     private void RunLoop()
     {
-        var (width, height) = _core.VideoSize;
-        var frame = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Opaque);
-        var periodTicks = Stopwatch.Frequency / FramesPerSecond;
-        // The deadline accumulates: each frame is due periodTicks after the last
-        // one, so per-frame jitter never accumulates into drift (audio stays in
-        // sync over hours).
-        long deadline = Stopwatch.GetTimestamp();
-
-        while (!_cancel.IsCancellationRequested)
+        try
         {
-            // Latch the newest input, drop anything older (a toggle during a frame).
-            uint keys;
-            lock (_keyGate) keys = _keysPending;
-            _core.SetKeys(keys);
-            _core.RunFrame();
+            var (width, height) = _core.VideoSize;
+            var frame = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Opaque);
+            lock (_frameGate) _frame = frame;
+            var basePeriodTicks = Stopwatch.Frequency / FramesPerSecond;
+            var frameCount = 0;
+            // Keep fractional clock ticks so timing error does not accumulate.
+            double deadline = Stopwatch.GetTimestamp();
 
-            // The frame is mGBA's 0x00BBGGRR little-endian: bytes R,G,B,X — the
-            // bitmap's Rgba8888 row layout, copied as-is.
-            _core.CopyFrame(MemoryMarshal.Cast<byte, uint>(frame.GetPixelSpan()));
-
-            lock (_frameGate)
+            while (!_cancel.IsCancellationRequested)
             {
-                _frameImage?.Dispose();
-                _frame = frame;
-                _frameImage = SKImage.FromBitmap(frame);
-            }
-            FrameProduced?.Invoke();
+                if (!_resume.IsSet)
+                {
+                    _resume.Wait(TimeSpan.FromMilliseconds(50));
+                    deadline = Stopwatch.GetTimestamp();
+                    continue;
+                }
 
-            // Drain this frame's audio into the track: the audio clock paces the
-            // loop when the track's buffer fills (writes block), which is the
-            // PokeDaisy-verified pattern — the game can never outrun its sound.
-            var frames = _core.ReadAudio(_audioScratch, AudioFramesPerDrain);
-            if (frames > 0 && _track is not null)
-            {
-                _audioBuffer.Rewind();
-                _audioBuffer.AsShortBuffer().Put(_audioScratch, 0, frames * 2);
-                _audioBuffer.Rewind();
-                // The track is in bytes: frames × 2 channels × 2 bytes.
-                _track.Write(_audioBuffer, frames * 4, WriteMode.Blocking);
-            }
+                var speedMultiplier = Volatile.Read(ref _speedMultiplier);
+                var framePeriodTicks = basePeriodTicks / speedMultiplier;
+                var publishFrame = ++frameCount % speedMultiplier == 0;
 
-            // Pace to the hardware rate. Sleep granularity (~15 ms on some
-            // kernels) is corrected by measuring and carrying the error forward.
-            deadline += (long)periodTicks;
-            var remaining = TimeSpan.FromSeconds((double)(deadline - Stopwatch.GetTimestamp()) / Stopwatch.Frequency);
-            if (remaining > TimeSpan.Zero)
-            {
-                // Sleep with a 1 ms margin, then spin the sub-millisecond slice:
-                // Sleep alone drifts with the scheduler's granularity.
-                Thread.Sleep(remaining + TimeSpan.FromMilliseconds(1));
-                while (Stopwatch.GetTimestamp() < deadline)
-                    Thread.SpinWait(64);
+                int audioFrames;
+                lock (_coreGate)
+                {
+                    if (_cancel.IsCancellationRequested) break;
+                    if (!_resume.IsSet) continue;
+
+                    // Latch the newest input, dropping anything older (a toggle during a frame).
+                    uint keys;
+                    lock (_keyGate) keys = _keysPending;
+                    _core.SetKeys(keys);
+                    _core.RunFrame();
+
+                    // mGBA's color_t is 0x00BBGGRR: bytes R,G,B,X match Rgba8888.
+                    if (publishFrame)
+                        _core.CopyFrame(MemoryMarshal.Cast<byte, uint>(frame.GetPixelSpan()));
+                    audioFrames = _core.ReadAudio(_audioScratch, AudioFramesPerDrain);
+                }
+
+                if (publishFrame)
+                {
+                    lock (_frameGate)
+                    {
+                        _frameImage?.Dispose();
+                        _frameImage = SKImage.FromBitmap(frame);
+                    }
+                    try { FrameProduced?.Invoke(); }
+                    catch (Exception error) { Services.AppLog.Warn("embedded", $"A frame listener failed: {error.Message}"); }
+                }
+
+                // The audio clock paces the loop when AudioTrack's buffer fills.
+                if (audioFrames > 0 && _track is not null && _audioEnabled && speedMultiplier == 1)
+                {
+                    lock (_audioGate)
+                    {
+                        if (Volatile.Read(ref _speedMultiplier) == 1)
+                        {
+                            try
+                            {
+                                _audioBuffer.Rewind();
+                                _audioBuffer.AsShortBuffer().Put(_audioScratch, 0, audioFrames * 2);
+                                _audioBuffer.Rewind();
+                                if (_track.Write(_audioBuffer, audioFrames * 4, WriteMode.Blocking) < 0)
+                                {
+                                    _audioEnabled = false;
+                                    Services.AppLog.Warn("embedded", "Game audio stopped after an AudioTrack write error.");
+                                }
+                            }
+                            catch (Exception error)
+                            {
+                                _audioEnabled = false;
+                                Services.AppLog.Warn("embedded", $"Game audio stopped: {error.Message}");
+                            }
+                        }
+                    }
+                }
+
+                // Carry timing error forward so scheduling jitter does not accumulate.
+                deadline += framePeriodTicks;
+                var remaining = TimeSpan.FromSeconds((deadline - Stopwatch.GetTimestamp()) / Stopwatch.Frequency);
+                if (remaining > TimeSpan.Zero)
+                {
+                    // Sleep with a 1 ms margin, then spin the sub-millisecond slice.
+                    var coarseSleep = remaining - TimeSpan.FromMilliseconds(1);
+                    if (coarseSleep > TimeSpan.Zero) Thread.Sleep(coarseSleep);
+                    while (Stopwatch.GetTimestamp() < deadline && !_cancel.IsCancellationRequested)
+                        Thread.SpinWait(64);
+                }
+                else if (remaining < TimeSpan.FromMilliseconds(-100))
+                {
+                    deadline = Stopwatch.GetTimestamp(); // recover without unbounded catch-up at higher speeds
+                }
             }
         }
-        frame.Dispose();
+        catch (Exception error)
+        {
+            Services.AppLog.Error("embedded", "The emulation thread stopped", error);
+        }
     }
 
     private void DisposeFrame()
@@ -169,11 +329,24 @@ internal sealed class EmbeddedEngine : IDisposable
 
     public void Dispose()
     {
+        lock (_lifecycleGate)
+        {
+            if (_disposed) return;
+            _disposed = true;
+        }
         _cancel.Cancel();
-        try { _thread.Join(500); } catch (ThreadStateException) { }
+        _resume.Set();
+        try { _track?.Stop(); } catch (Exception) { }
+        try
+        {
+            if (_thread.ThreadState != System.Threading.ThreadState.Unstarted)
+                _thread.Join();
+        }
+        catch (ThreadStateException) { }
+        FrameProduced = null;
         DisposeFrame();
-        _track?.Stop();
-        _track?.Release();
+        try { _track?.Release(); } catch (Exception) { }
+        _resume.Dispose();
         _cancel.Dispose();
     }
 }

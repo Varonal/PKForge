@@ -43,6 +43,13 @@ public sealed class AndroidEmulatorLauncher : IEmulatorLauncher
             Services.AppLog.Info("launch", "Embedded launch requested on the external launcher; the views route it to EmbeddedGameSession instead.");
             return false;
         }
+        if (RomLinkRules.MustRunInApp(link.Generation, link.RomFileName))
+        {
+            Services.AppLog.Error("launch",
+                $"Rejected external handoff for an integrated Pokémon ROM: Gen {link.Generation}, {link.RomFileName}.",
+                new InvalidOperationException("This ROM must be launched through PKForge's embedded core."));
+            return false;
+        }
         var app = EmulatorCatalog.App(link.Emulator);
         var package = app.PackageIds.FirstOrDefault(IsInstalled) ?? app.PrimaryPackage;
         if (!IsInstalled(package))

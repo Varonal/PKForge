@@ -10,9 +10,9 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <ApplicationId>org.pkforge.app</ApplicationId>
     <ApplicationTitle>PKForge</ApplicationTitle>
-    <ApplicationVersion>311</ApplicationVersion>
-    <ApplicationDisplayVersion>3.1.1</ApplicationDisplayVersion>
-    <RuntimeIdentifiers>android-arm64</RuntimeIdentifiers>
+    <ApplicationVersion>325</ApplicationVersion>
+    <ApplicationDisplayVersion>3.1.15</ApplicationDisplayVersion>
+    <RuntimeIdentifier>android-arm64</RuntimeIdentifier>
     <!-- The LibraryImport source generator (MgbaNative) emits unsafe interop stubs. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
@@ -76,6 +76,7 @@
     <!-- In-game box wallpapers (PKHeX WallpaperUtil resource names) for the box manager's wallpaper picker. -->
     <MauiAsset Include="../../external/PKHeX/PKHeX.Drawing.Misc/Resources/img/box/**/*.png" LogicalName="wallpapers/%(Filename)%(Extension)" />
     <MauiAsset Include="../../external/PKHeX/PKHeX.Drawing.Misc/Resources/img/ribbons/ribbonchampionkalos.png" LogicalName="ui/pksm/ribbon_award.png" />
+    <MauiAsset Include="../../external/azahar/LICENSE.txt" LogicalName="licenses/azahar-gpl-3.0.txt" />
     <!-- Game icons + hero art fetched once at build time from SteamGridDB (no key ships in the app). -->
     <MauiAsset Include="Resources/GameArt/*.png" LogicalName="gameart/%(Filename)%(Extension)" />
     <MauiAsset Include="Resources/GameHero/*.png" LogicalName="gamehero/%(Filename)%(Extension)" />
@@ -84,10 +85,13 @@
     <MauiAsset Include="Resources/UI/pksm/*.png" LogicalName="ui/pksm/%(Filename)%(Extension)" />
     <!-- The designer's icons for the new art direction (summary tabs, footer buttons). -->
     <MauiAsset Include="Resources/UI/design/*.png" LogicalName="ui/design/%(Filename)%(Extension)" />
-    <!-- The embedded mGBA core shim (built by tools/build-mgba/build.sh). Optional:
-         the app runs without it; the Play screen falls back to the external
-         emulators when the library is absent. -->
+    <!-- The embedded mGBA core shim (built by tools/build-mgba/build.sh). Optional
+         in diagnostic builds, but required for GB/GBC/GBA in-app play. -->
     <AndroidNativeLibrary Include="Libraries/arm64-v8a/libpkforge_mgba.so" Condition="Exists('Libraries/arm64-v8a/libpkforge_mgba.so')" />
+    <!-- melonDS core-only Android bridge for in-app Nintendo DS sessions. -->
+    <AndroidNativeLibrary Include="Libraries/arm64-v8a/libpkforge_melonds.so" Condition="Exists('Libraries/arm64-v8a/libpkforge_melonds.so')" />
+    <!-- Azahar's in-process 3DS libretro core; the app frontend integration is in progress. -->
+    <AndroidNativeLibrary Include="Libraries/arm64-v8a/libpkforge_azahar.so" Condition="Exists('Libraries/arm64-v8a/libpkforge_azahar.so')" />
 
     <!-- The Poképark: the artist's map at native size, its ground, objects and their depth. -->
     <MauiAsset Include="Resources/Pokepark/park/*.png" LogicalName="pokepark/park/%(Filename)%(Extension)" />

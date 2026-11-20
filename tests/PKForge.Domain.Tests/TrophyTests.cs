@@ -256,6 +256,7 @@ public sealed class RomNameRulesTests
         Assert.Equal(expected, RomNameRules.GenerationOf(gameName));
 }
 
+[Collection(EmulatorCatalogCollection.Name)]
 public sealed class ConsoleRulesTests
 {
     [Fact]
@@ -271,11 +272,12 @@ public sealed class ConsoleRulesTests
     [Fact]
     public void EachConsoleNamesItsEmulatorsInPreferenceOrder()
     {
+        using var cores = new EmbeddedCoreAvailabilityScope(mgba: true, melonDs: true);
         // GB/GBC/GBA play in PKForge itself — the embedded core, no external emulator.
         Assert.Equal([EmulatorKind.Embedded], ConsoleRules.EmulatorsFor(GameConsole.GameBoy));
         Assert.Equal([EmulatorKind.Embedded], ConsoleRules.EmulatorsFor(GameConsole.GameBoyColor));
         Assert.Equal([EmulatorKind.Embedded], ConsoleRules.EmulatorsFor(GameConsole.GameBoyAdvance));
-        Assert.Equal(EmulatorKind.MelonDS, ConsoleRules.EmulatorsFor(GameConsole.NintendoDs)[0]);
+        Assert.Equal([EmulatorKind.Embedded], ConsoleRules.EmulatorsFor(GameConsole.NintendoDs));
         Assert.Equal(EmulatorKind.Azahar, ConsoleRules.EmulatorsFor(GameConsole.Nintendo3Ds)[0]);
         Assert.Equal(EmulatorKind.Eden, ConsoleRules.EmulatorsFor(GameConsole.NintendoSwitch)[0]);
     }
@@ -284,8 +286,10 @@ public sealed class ConsoleRulesTests
     [InlineData(GameConsole.GameBoy)]
     [InlineData(GameConsole.GameBoyColor)]
     [InlineData(GameConsole.GameBoyAdvance)]
+    [InlineData(GameConsole.NintendoDs)]
     public void InAppConsolesNeverOfferAnExternalEmulator(GameConsole console)
     {
+        using var cores = new EmbeddedCoreAvailabilityScope(mgba: true, melonDs: true);
         // The single source of truth for "this console runs in PKForge": every candidate
         // list for it is exactly [Embedded] — no RetroArch/Linkboy/PizzaBoy can leak in.
         Assert.True(ConsoleRules.RunsInApp(console));
@@ -295,7 +299,6 @@ public sealed class ConsoleRulesTests
     }
 
     [Theory]
-    [InlineData(GameConsole.NintendoDs)]
     [InlineData(GameConsole.Nintendo3Ds)]
     [InlineData(GameConsole.GameCube)]
     [InlineData(GameConsole.NintendoSwitch)]
@@ -308,22 +311,13 @@ public sealed class ConsoleRulesTests
     [Fact]
     public void InstallChecksFollowThePreferenceList()
     {
-        // The embedded core needs no package: GB counts as covered exactly when the
-        // shim is packed (EmbeddedCoreAvailable, probed at app startup).
-        var previous = EmulatorCatalog.EmbeddedCoreAvailable;
-        try
-        {
-            EmulatorCatalog.EmbeddedCoreAvailable = true;
-            Assert.True(ConsoleRules.AnyInstalled(GameConsole.GameBoy, _ => false));
-            EmulatorCatalog.EmbeddedCoreAvailable = false;
-            Assert.False(ConsoleRules.AnyInstalled(GameConsole.GameBoy, _ => false));
-            Assert.True(ConsoleRules.AnyInstalled(GameConsole.NintendoDs, id => id == "io.github.melonds"));
-            Assert.False(ConsoleRules.AnyInstalled(GameConsole.Nintendo3Ds, id => id == "com.retroarch"));
-        }
-        finally
-        {
-            EmulatorCatalog.EmbeddedCoreAvailable = previous;
-        }
+        using var cores = new EmbeddedCoreAvailabilityScope(mgba: true, melonDs: false);
+        Assert.True(ConsoleRules.AnyInstalled(GameConsole.GameBoy, _ => false));
+        Assert.Empty(ConsoleRules.EmulatorsFor(GameConsole.NintendoDs));
+        Assert.False(ConsoleRules.AnyInstalled(GameConsole.NintendoDs, _ => true));
+        EmulatorCatalog.EmbeddedDsCoreAvailable = true;
+        Assert.True(ConsoleRules.AnyInstalled(GameConsole.NintendoDs, _ => false));
+        Assert.False(ConsoleRules.AnyInstalled(GameConsole.Nintendo3Ds, id => id == "com.retroarch"));
     }
 }
 

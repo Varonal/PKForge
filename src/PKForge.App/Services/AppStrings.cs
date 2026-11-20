@@ -48,11 +48,25 @@ public static class AppStrings
     // ---- Library ----
     public static string LibraryTitle => Fr ? "Bibliothèque" : "Library";
     public static string ScanRoms => Fr ? "Scanner les ROMs" : "Scan ROMs";
+    public static string LibrarySearch => Fr ? "Rechercher un jeu" : "Search games";
+    public static string LibrarySearchPlaceholder => Fr ? "Jeu ou nom du fichier ROM…" : "Game or ROM filename…";
+    public static string LibraryClearSearch => Fr ? "Effacer la recherche" : "Clear search";
+    public static string LibraryScanHint => Fr
+        ? "Appuyez sur Scanner pour chercher vos ROMs dans /storage/emulated/0/ROMs."
+        : "Tap Scan to look for your ROMs in /storage/emulated/0/ROMs.";
+    public static string LibraryReady => Fr
+        ? "Touchez une ROM pour la lancer, ou sélectionnez-la puis appuyez sur A."
+        : "Tap a ROM to launch it, or select it and press A.";
+    public static string LibraryNoResults(string query) => Fr
+        ? $"Aucun jeu ne correspond à « {query} »."
+        : $"No games match “{query}”.";
+    public static string LibraryResults(int count, int roms) => Fr
+        ? $"{count} résultat(s) · {roms} ROM(s)"
+        : $"{count} result(s) · {roms} ROM(s)";
     public static string NoRomRoot => Fr
         ? "Dossier ROMs introuvable. Accordez l'accès à tous les fichiers dans les réglages Android, puis rescannez."
         : "No ROMs folder found. Grant All files access in Android settings, then scan again.";
     public static string Scanning => Fr ? "Scan en cours…" : "Scanning…";
-    public static string RomCount(int count) => Fr ? $"{count} ROM(s) Pokémon trouvée(s)." : $"{count} Pokémon ROM(s) found.";
     public static string Play => Fr ? "Jouer" : "Play";
 
     // ---- Cartridge menu ----
@@ -60,6 +74,114 @@ public static class AppStrings
     public static string UnlinkRom => Fr ? "Délier la ROM" : "Unlink ROM";
     public static string PickFromLibrary => Fr ? "Choisir dans la bibliothèque" : "Pick from library";
     public static string RomMissing => Fr ? "Émulateur manquant" : "Emulator missing";
+    public static string GamePause => Fr ? "Pause" : "Pause";
+    public static string GameResume => Fr ? "Reprendre" : "Resume";
+    public static string GameOptions => Fr ? "Options" : "Options";
+    public static string GameOptionsSpeed(int multiplier) => $"Options · ×{multiplier}";
+    public static string GameSpeed => Fr ? "Vitesse du jeu" : "Game speed";
+    public static string GameSpeedMenuLabel(int multiplier) => Fr
+        ? $"Vitesse du jeu · ×{multiplier}"
+        : $"Game speed · ×{multiplier}";
+    public static string GameSpeedHelp => Fr
+        ? "Choisis une accélération. Le son est coupé au-dessus de ×1 et revient à vitesse normale."
+        : "Choose a fast-forward speed. Audio is muted above ×1 and returns at normal speed.";
+    public static string GameSpeedChoice(int multiplier) => multiplier == 1
+        ? Fr ? "×1 · normale" : "×1 · normal"
+        : $"×{multiplier}";
+    public static string GameDisplay => Fr ? "Taille du jeu" : "Game size";
+    public static string GameDisplayHelp => Fr
+        ? "Choisis la taille de l'image. Le rapport du jeu reste toujours respecté."
+        : "Choose the game image size. The game's aspect ratio is always preserved.";
+    public static string GameScaleFit => Fr ? "Maximum · adapter à l'écran" : "Maximum · fit screen";
+    public static string GameScale90 => Fr ? "90 % de la taille maximale" : "90% of maximum size";
+    public static string GameScale75 => Fr ? "75 % de la taille maximale" : "75% of maximum size";
+    public static string GameScalePixelPerfect => Fr ? "Pixels entiers · pixel perfect" : "Whole pixels · pixel perfect";
+    public static string GameEnterFullScreen => Fr ? "Plein écran" : "Full screen";
+    public static string GameExitFullScreen => Fr ? "Afficher l'interface" : "Show interface";
+    public static string GameToggleTouchControls => Fr ? "Afficher les commandes tactiles" : "Toggle touch controls";
+    public static string GameHideTouchControls => Fr ? "Masquer les commandes" : "Hide controls";
+    public static string GameShowTouchControls => Fr ? "Afficher les commandes" : "Show controls";
+    public static string GameSaveState => Fr ? "Sauvegarder l'état" : "Save state";
+    public static string GameLoadState => Fr ? "Charger l'état" : "Load state";
+    public static string GameExit => Fr ? "Quitter le jeu" : "Exit game";
+    public static string GameSavingState => Fr ? "Sauvegarde de l'état…" : "Saving state…";
+    public static string GameLoadingState => Fr ? "Chargement de l'état…" : "Loading state…";
+    public static string GamePaused => Fr ? "Jeu en pause." : "Game paused.";
+    public static string GameStateSaved => Fr ? "État sauvegardé." : "State saved.";
+    public static string GameStateLoaded => Fr ? "État chargé." : "State loaded.";
+    public static string GameStateSaveFailed => Fr ? "Impossible de sauvegarder l'état." : "Could not save the state.";
+    public static string GameStateLoadFailed => Fr ? "Impossible de charger l'état." : "Could not load the state.";
+    public static string CompanionParty => Fr ? "ÉQUIPE" : "PARTY";
+    public static string CompanionBag => Fr ? "SAC" : "BAG";
+    public static string CompanionPokedex => Fr ? "POKÉDEX" : "POKÉDEX";
+    public static string CompanionSession => Fr ? "SESSION" : "SESSION";
+    public static string CompanionRestorePoints => Fr ? "REPRISES" : "RESTORES";
+    public static string CompanionSettings => Fr ? "OPTIONS" : "SETTINGS";
+    public static string CompanionSettingsTitle => Fr ? "Options du compagnon" : "Companion settings";
+    public static string CompanionSettingsHelp => Fr
+        ? "Choisis les pages visibles et celle qui s'ouvre en premier."
+        : "Choose which pages are visible and which one opens first.";
+    public static string CompanionShowTab => Fr ? "Afficher" : "Show";
+    public static string CompanionHideTab => Fr ? "Masquer" : "Hide";
+    public static string CompanionMakeHome => Fr ? "Ouvrir au démarrage" : "Open on launch";
+    public static string CompanionCurrentHome => Fr ? "Page d'accueil" : "Home page";
+    public static string CompanionNoParty => Fr
+        ? "Aucune équipe n'est enregistrée dans cette sauvegarde valide."
+        : "No party is recorded in this valid save.";
+    public static string CompanionNoSavedData => Fr
+        ? "Aucune sauvegarde valide n'est disponible pour ce jeu."
+        : "No valid save is available for this game.";
+    public static string CompanionSavedDataNotice => Fr
+        ? "Données de la dernière sauvegarde valide"
+        : "Data from the latest valid game save";
+    public static string CompanionBagEmpty => Fr ? "Le sac est vide." : "The bag is empty.";
+    public static string CompanionEgg => Fr ? "ŒUF" : "EGG";
+    public static string CompanionPocketAll => Fr ? "TOUT" : "ALL";
+    public static string CompanionPocketItems => Fr ? "OBJETS" : "ITEMS";
+    public static string CompanionPocketKeyItems => Fr ? "OBJETS RARES" : "KEY ITEMS";
+    public static string CompanionPocketMedicine => Fr ? "MÉDICAMENTS" : "MEDICINE";
+    public static string CompanionPocketBalls => Fr ? "POKÉ BALLS" : "POKÉ BALLS";
+    public static string CompanionPocketMachines => Fr ? "CT / CS" : "TMs / HMs";
+    public static string CompanionPocketBerries => Fr ? "BAIES" : "BERRIES";
+    public static string CompanionPocketBattleItems => Fr ? "OBJETS DE COMBAT" : "BATTLE ITEMS";
+    public static string CompanionPocketMail => Fr ? "COURRIER" : "MAIL";
+    public static string CompanionPartyMember(int index, string nickname, string species, int level, bool isEgg = false) =>
+        isEgg
+            ? $"{index}. {nickname} · {species}"
+            : Fr
+                ? $"{index}. {nickname} · {species} · N. {level}"
+                : $"{index}. {nickname} · {species} · Lv. {level}";
+    public static string CompanionHp(int current, int maximum) => Fr ? $"{current}/{maximum} PV" : $"{current}/{maximum} HP";
+    public static string CompanionDex(int caught, int seen, int total) => Fr
+        ? $"Capturés {caught} · vus {seen} · total {total}"
+        : $"Caught {caught} · seen {seen} · total {total}";
+    public static string CompanionPlaytime(int hours, int minutes) => Fr
+        ? $"Temps de jeu · {hours} h {minutes:D2}"
+        : $"Play time · {hours} h {minutes:D2}";
+    public static string CompanionPartyLabel(int count) => Fr ? $"Équipe · {count}/6" : $"Party · {count}/6";
+    public static string CompanionNoRestorePoints => Fr ? "Aucun point de restauration disponible." : "No restore points are available.";
+    public static string GameBatterySaveFailed => Fr
+        ? "PKForge n'a pas pu confirmer l'enregistrement de la sauvegarde de jeu. Vérifiez l'espace disponible et l'accès au fichier."
+        : "PKForge could not confirm the game save. Check available storage and file access.";
+    public static string GameBatterySaveFailedTitle => Fr ? "Sauvegarde de jeu non synchronisée" : "Game save not synchronized";
+    public static string GameSaveConflict => Fr
+        ? "Le fichier lié et la sauvegarde locale ont changé séparément. Aucune copie n'a été écrasée."
+        : "The linked file and private game save changed separately. Neither copy was overwritten.";
+    public static string GameLaunchFailedTitle => Fr ? "Jeu impossible à lancer" : "Could not launch";
+    public static string GameLaunchFailed(string name, string? reason = null, int generation = 0)
+    {
+        var core = generation is 4 or 5 ? "melonDS" : "mGBA";
+        var message = Fr
+            ? $"{name} n'a pas pu démarrer dans PKForge. Vérifie la ROM, le cœur {core} intégré et l'accès à la sauvegarde."
+            : $"{name} could not start in PKForge. Check the ROM, the integrated {core} core, and save-file access.";
+        return string.IsNullOrWhiteSpace(reason) ? message : $"{message}\n\n{reason}";
+    }
+    public static string EmbeddedCoreMissing(int generation) => Fr
+        ? $"Le cœur PKForge pour la génération {generation} n'est pas présent ou chargeable dans cette APK. La ROM ne sera pas envoyée à un émulateur externe."
+        : $"PKForge's integrated core for generation {generation} is missing or could not be loaded from this APK. The ROM will not be handed to an external emulator.";
+    public static string EmbeddedRomFormatUnsupported(int generation, string fileName) => Fr
+        ? $"PKForge ne prend pas encore en charge ce format pour la génération {generation} : {fileName}. Les archives et formats DSi ne sont pas encore intégrés."
+        : $"PKForge does not support this format for generation {generation} yet: {fileName}. Archives and DSi formats are not integrated yet.";
 
     // ---- External companion: play stats ----
     public static string SessionTime => Fr ? "Session" : "Session";
@@ -68,20 +190,31 @@ public static class AppStrings
     public static string DexProgressLabel => Fr ? "Dex" : "Dex";
     public static string PlaytimeHours(int hours, int minutes) => Fr ? $"{hours} h {minutes:00} min" : $"{hours}h {minutes:00}m";
 
-    // ---- External companion: restore points ----
-    // (RestorePointsTitle / Restore / RestoreThisPoint already exist in the "Restore points" section below.)
-    public static string NoRestorePoints => Fr ? "Aucun point pour ce jeu." : "No restore point for this game.";
-    public static string CreateRestorePoint => Fr ? "Créer un point de restauration" : "Create a restore point";
-    public static string RestorePointCreated => Fr ? "Point de restauration créé." : "Restore point created.";
-    public static string RestorePointCreateFailed => Fr ? "Impossible de créer le point (sauvegarde illisible ?)." : "Could not create the point (save unreadable?).";
-    public static string RestorePointConfirm => Fr
-        ? "La sauvegarde du jeu sera remplacée par ce point. Une sauvegarde de sécurité est faite d'abord."
-        : "The game's save will be replaced by this point. A safety backup is made first.";
-    public static string RestoreDone => Fr ? "Point restauré. Relancez le jeu pour le charger." : "Point restored. Relaunch the game to load it.";
-    public static string RestoreFailed => Fr ? "La restauration a échoué (point illisible ?)." : "Restore failed (point unreadable?).";
-
     // ---- Trophies ----
     public static string TrophiesTitle => Fr ? "Trophées" : "Trophies";
+    public static string MuseumTitle => Fr ? "Musée" : "Museum";
+    public static string MuseumScan => Fr ? "Actualiser" : "Refresh";
+    public static string MuseumPrevious => Fr ? "Précédent" : "Previous";
+    public static string MuseumNext => Fr ? "Suivant" : "Next";
+    public static string MuseumReading => Fr ? "Lecture des Pokédex liés…" : "Reading linked Pokédexes…";
+    public static string MuseumReadOnly => Fr
+        ? "Lecture seule · progression lue dans la dernière sauvegarde de chaque jeu."
+        : "Read only · progress is read from each game's latest save.";
+    public static string MuseumNoSaves => Fr
+        ? "Aucune sauvegarde liée. Liez un jeu depuis l'écran d'accueil pour remplir le Musée."
+        : "No linked saves. Link a game from Home to fill the Museum.";
+    public static string MuseumReadError(string error) => Fr
+        ? $"Sauvegarde illisible : {error}"
+        : $"Save could not be read: {error}";
+    public static string MuseumProgress(int seen, int caught, int total, int shiny) => Fr
+        ? $"{seen}/{total} vus · {caught}/{total} capturés · {shiny} chromatiques"
+        : $"{seen}/{total} seen · {caught}/{total} caught · {shiny} shiny";
+    public static string MuseumNoDex => Fr
+        ? "Aucune entrée Pokédex lisible pour cette sauvegarde."
+        : "No readable Pokédex entries in this save.";
+    public static string MuseumSpeciesState(bool seen, bool caught, bool shiny) => Fr
+        ? $"{(caught ? "Capturé" : seen ? "Vu" : "Non découvert")}{(shiny ? " · chromatique dans la sauvegarde" : "")}"
+        : $"{(caught ? "Caught" : seen ? "Seen" : "Unseen")}{(shiny ? " · shiny in this save" : "")}";
     public static string ScanSaves => Fr ? "Analyser les sauv." : "Scan saves";
     public static string Unlocked => Fr ? "Débloqué" : "Unlocked";
 
