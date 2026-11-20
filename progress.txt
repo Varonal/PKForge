@@ -119,3 +119,15 @@ null path). prd.json: US-004 passes=true. progress.txt: appended learnings." && 
   - `SessionElapsed` doit gérer l'horloge qui recule (now < since → zero, jamais négatif).
   - Pour US-007 (vue companion 2ᵉ écran) : tout est prêt — `IGameCompanionStore.External` (dex/playtime snapshot) + `IPlaySessionStore.Find(romPath)` (session/total) + `ExternalRestorePointService` (points) ; reste à brancher l'affichage + README.
 ---
+
+## 2026-11-20 ~09:30 - US-007 (finalization)
+- Vue companion externe branchée sur le 2ᵉ écran : `GameCompanionView.ShowExternal(ExternalCompanionSnapshot, PlaySessionStats?)` affiche dex (caught/total + %), équipe /6, playtime de la sauvegarde, chrono de session + total (US-006) — **read-only**, uniquement sur l'écran inférieur (jamais par-dessus l'émulateur du 1ᵉʳ écran). `SecondScreenBoxPage.SwapCoreAsync` la nourrit depuis `IGameCompanionStore.External` + `IExternalCompanionStateStore.Current.RomPath` + `IPlaySessionStore.Find(romPath)`, et réagit au `PropertyChanged` de `External` (comme `Live`/`Current`).
+- README : « Companion de jeu externe (modèle polling .sav) » déplacé de 🚧 En cours vers ✅ Fait, avec la ligne de description du modèle (stat toutes les 5 s, relecture après flush stable, parse, affichage dex/équipe/temps/session/points de restauration).
+- `AGENTS.md` créé à la racine : architecture 3 couches, patterns (DispatchProxy pour les grosses interfaces, persistance JSON atomique, polling économe, mesure par timestamps, chemins Android normalisés, lifecycle `App.Resumed`, localisation AppStrings, boucle Ralph).
+- Toutes les chaînes UI neuves de la run sont FR-par-défaut/EN dans `AppStrings` (US-005: 10 clés, US-006: 5 clés; US-007 réutilise `DexProgressLabel`/`SavePlaytime`/`SessionTime`/`TotalPlaytime`/`PlaytimeHours`).
+- Fichiers modifiés : `GameCompanionView.cs`, `SecondScreenBoxPage.cs`, `README.md`, `AGENTS.md` (nouveau), `prd.json` (US-007 passes=true — **toutes les stories passent**), `progress.txt`.
+- **Apprentissages pour les itérations suivantes :**
+  - Le swap du second écran est centralisé dans `SecondScreenBoxPage.SwapCoreAsync` : toute nouvelle surface y branche un `if (...) view.Show(...)` + visibilité, et s'abonne aux `PropertyChanged` concernés via `QueueSwap()` (coalescé). Le companion (`showCompanion`) a priorité sur toutes les autres surfaces quand un émulateur tient le premier plan.
+  - Le companion reste **read-only** côté vue : les actions destructives (restore) passent par `PadMenu.ConfirmAsync` sur le host, jamais en direct depuis le 2ᵉ écran.
+  - Historique git de la run : uniquement des commits conventionnels `feat: US-00X - ...` + `fix:`/`docs:` — aucun WIP.
+---

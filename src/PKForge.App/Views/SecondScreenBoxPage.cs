@@ -185,6 +185,13 @@ public sealed class SecondScreenBoxPage : ContentPage
             if (showTrophies) trophyLadder.Show(state!.TrophyLadder!);
             if (active is { } shownCompanion) companion.Show(shownCompanion);
             if (companionStore?.Live is { } liveSnapshot) companion.ShowLive(liveSnapshot);
+            if (companionStore?.External is { } externalSnapshot)
+            {
+                // US-007: the external companion overlay (polled .sav snapshot + session chrono).
+                var romPath = services?.GetService<IExternalCompanionStateStore>()?.Current?.RomPath;
+                var session = romPath is null ? null : services?.GetService<IPlaySessionStore>()?.Find(romPath);
+                companion.ShowExternal(externalSnapshot, session);
+            }
 
             journal.IsVisible = showJournal;
             dex.IsVisible = showDex;
@@ -247,7 +254,7 @@ public sealed class SecondScreenBoxPage : ContentPage
         {
             _companionHandler = (_, args) =>
             {
-                if (args.PropertyName is nameof(Services.GameCompanionStore.Live) or nameof(Services.GameCompanionStore.Current))
+                if (args.PropertyName is nameof(Services.GameCompanionStore.Live) or nameof(Services.GameCompanionStore.Current) or nameof(Services.GameCompanionStore.External))
                     QueueSwap();
             };
             companionStore.PropertyChanged += _companionHandler;
