@@ -112,7 +112,7 @@ public sealed partial class GameCompanionStore : ObservableObject, IGameCompanio
         try
         {
             var services = IPlatformApplication.Current?.Services;
-            services.GetService<ExternalSaveMonitor>()?.Stop();
+            services?.GetService<ExternalSaveMonitor>()?.Stop();
             // US-006: close the play session of the game we were watching (keyed by its ROM
             // path) before clearing the persisted state — after Close, nothing measures.
             if (services?.GetService<IExternalCompanionStateStore>()?.Current is { } state
