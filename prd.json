@@ -78,8 +78,8 @@
         "Logique domaine pure testée (nommage, horodatage, ordre) ; build App et tests Domain passent"
       ],
       "priority": 5,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Domain rules pure + testées: RestorePointRules.ForGame (filtre BelongsTo, newest-first), OrderNewestFirst, NameFor(kind, utc, fr) nommage horodaté invariant (FR/EN). App: ExternalRestorePointService (DI) — ListForAsync via IBackupService.ListAsync + BelongsTo(savePath, snapshot); CreatePointAsync = backup atomique nommé/horodaté via IBackupService.CreateAsync(documentId=savePath), jamais d'écriture in-place; RestoreAsync = PadMenu.ConfirmAsync obligatoire (destructif) + safety backup de la save courante + ReadAsync(hash-check) + écriture atomique temp+move. Chaînes UI FR/EN dans AppStrings. 8 tests Domain. CI: tests Release + build APK. Manuel on device (US-007 branche la vue companion): depuis le companion d'un jeu externe, créer un point, le voir listé en tête, restaurer avec confirmation → le .sav est remplacé et un point de sécurité existe; aucun crash si le point est corrompu."
     },
     {
       "id": "US-006",

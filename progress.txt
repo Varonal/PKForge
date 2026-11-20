@@ -90,3 +90,18 @@ tail -2 progress.txt && git add -A && git commit -m "feat: US-004 - Companion li
 
 5 new store tests (empty, set/clear, reopen-after-kill, corrupt file, in-memory
 null path). prd.json: US-004 passes=true. progress.txt: appended learnings." && git push origin ralph/external-companion 2>&1 | tail -1 && git log --oneline -2
+## 2026-11-19 ~17:10 - US-005
+- Règles pures Domain (`src/PKForge.Domain/ExternalRestorePoints.cs`) : `RestorePointRules.ForGame(all, documentId, open)` filtre via `BackupInfo.BelongsTo` (documentId direct, ou fallback format+génération+nom pour les points legacy sans documentId) et trie **newest-first** ; `OrderNewestFirst` stable ; `NameFor(kind, utc, french)` = nommage horodaté en culture invariante ("Point de restauration · 2026-11-19 16:50" / "Restore point · ..."), `RestorePointKind.Manual` / `SafetyBeforeRestore`. Aucun I/O, la locale arrive en paramètre bool — testable.
+- App : `ExternalRestorePointService` (enregistré dans MauiProgram) au-dessus du pipeline de backup **atomique existant** `IBackupService` :
+  - `ListForAsync(savePath)` : ouvre le .sav via `engine.Validate` + `engine.Open` → filtre `BelongsTo(savePath, snapshot)` → `CompanionRestorePoint` newest-first.
+  - `CreatePointAsync(savePath)` : backup **nommé et horodaté** via `backups.CreateAsync(snapshot, name, documentId: savePath)` — jamais d'écriture in-place sur la save.
+  - `RestoreAsync(host, savePath, backupId)` : **confirmation obligatoire** (`PadMenu.ConfirmAsync`, destructif) → **safety backup** de la save courante (CreateAsync, nom SafetyBeforeRestore) → `backups.ReadAsync` (hash SHA256 vérifié, point corrompu → échec propre) → écriture du .sav **atomiquement** (temp + `File.Move(overwrite:true)`).
+- Chaînes UI FR par défaut / EN dans `AppStrings` (10 nouvelles clés : RestorePointsTitle, NoRestorePoints, CreateRestorePoint, RestorePointCreated/Failed, RestorePointTitle/Confirm, Restore, RestoreDone/Failed).
+- Fichiers modifiés : `ExternalRestorePoints.cs` (nouveau), `ExternalRestorePointService.cs` (nouveau), `AppStrings.cs`, `MauiProgram.cs` (DI), `tests/.../ExternalRestorePointsTests.cs` (nouveau, 8 tests : ordre newest-first, filtrage BelongsTo avec/sans snapshot, legacy sans documentId, stabilité, nommage FR/EN, horloge UTC invariante), `prd.json` (US-005 passes=true), `progress.txt`.
+- **Apprentissages pour les itérations suivantes :**
+  - `IBackupService` est LE pipeline de backup atomique (bytes + sidecar JSON, hash SHA256 vérifié au ReadAsync, `BackupInfo.BelongsTo(documentId, snapshot)` avec fallback legacy format+gen+nom) — réutiliser tel quel pour toute restauration, ne jamais écrire la save du jeu in-place sans backup de sécurité.
+  - `PadMenu.ConfirmAsync(host, title, message, confirmLabel)` = la confirmation destructive standard (bouton Annuler/Cancel existe déjà).
+  - Écriture atomique d'un fichier arbitraire : temp `path + ".tmp"` (ou suffixe dédié) + `File.Move(temp, path, overwrite: true)` — même pattern que les stores JSON.
+  - Localisation : toutes les chaînes UI vont dans `AppStrings` avec `Fr ? "…" : "…"` ; la logique pure Domain prend un `bool french` en paramètre (la locale ne vient jamais du Domain).
+  - Pour US-007 (vue companion) : le service est prêt à être consommé (ListForAsync/CreatePointAsync/RestoreAsync avec host Grid pour la confirmation) ; le snapshot externe (`IGameCompanionStore.External`) fournit le label/dex/playtime à afficher à côté.
+---

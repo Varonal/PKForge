@@ -102,6 +102,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<Services.GameCompanionStore>();
         builder.Services.AddSingleton<Domain.IGameCompanionStore>(sp => sp.GetRequiredService<Services.GameCompanionStore>());
         builder.Services.AddSingleton<Services.ExternalSaveMonitor>();
+        builder.Services.AddSingleton<Services.ExternalRestorePointService>();
         builder.Services.AddSingleton<Services.TrophyWatcherService>();
         builder.Services.AddSingleton<IConsoleEmulatorStore>(new Infrastructure.JsonConsoleEmulatorStore(
             Path.Combine(FileSystem.AppDataDirectory, "console-emulators.json")));
