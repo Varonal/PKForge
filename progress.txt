@@ -147,3 +147,6 @@ null path). prd.json: US-004 passes=true. progress.txt: appended learnings." && 
 ## 2026-11-20 - APK de test après revue
 - APK Release `3.1.15` / code `325` reconstruit après les corrections : `artifacts/PKForge-3.1.15-android-arm64.apk` (82 585 907 octets). Signature Android Debug présente, zipalign validé, `libpkforge_mgba.so` et `libpkforge_melonds.so` inclus. Aucun APK ajouté au dépôt.
 ---
+## 2026-11-20 - APK final après régénération mGBA CI
+- Le bot PKForge CI a ajouté un commit ne modifiant que `libpkforge_mgba.so` (`d39c0fc`). APK Release reconstruit depuis cette tête : `artifacts/PKForge-3.1.15-android-arm64.apk` (82 251 161 octets), signature installable, zipalign et présence des cœurs mGBA/melonDS vérifiés. Le changement est limité au binaire natif.
+---
